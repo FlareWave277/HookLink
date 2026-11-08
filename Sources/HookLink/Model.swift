@@ -133,9 +133,12 @@ final class HookLink: ObservableObject {
         let brew = await Runner.capture(["brew", "--version"])
         add("brew", "Homebrew", brew.status == 0 ? .ok : .missing, brew.status == 0 ? (brew.out.split(separator: "\n").first.map(String.init) ?? "") : "Install it from brew.sh (one command in Terminal), then check again.")
 
-        let py = await Runner.capture(["python3", "-c", "import sys; print('%d.%d' % sys.version_info[:2])"])
-        let pyOK = py.status == 0 && (Double(py.out.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0) >= 3.12
-        add("python", "Python 3.12 or newer", pyOK ? .ok : .missing, pyOK ? "Python \(py.out.trimmingCharacters(in: .whitespacesAndNewlines))" : "Click Install tools below (Homebrew's python).")
+        let py = await findPython()
+        add("python", "Python 3.12 or newer", py != nil ? .ok : .missing, py.map { "\($0.version) at \($0.path)" } ?? "Click Install tools below (Homebrew's Python 3.13). The Python macOS comes with is too old.")
+
+        let ios = await Runner.capture(["xcrun", "--sdk", "iphoneos", "--show-sdk-path"])
+        add("ios", "Xcode's iOS platform", ios.status == 0 ? .ok : .missing,
+            ios.status == 0 ? "Installed" : "Open Xcode → Settings → Components and install the iOS platform, then check again.")
 
         var tools: [String] = []
         for t in ["xcodegen", "zstd", "glslangValidator"] { if (await Runner.capture(["which", t])).status != 0 { tools.append(t) } }
@@ -156,6 +159,30 @@ final class HookLink: ObservableObject {
     }
     var macReady: Bool { !checks.isEmpty && !checks.contains { $0.state == .missing } }
 
+    /// A Python of 3.12 or newer: Homebrew's first, newest first, then whatever python3 is on PATH. nil when there is none.
+    func findPython() async -> (path: String, version: String)? {
+        var candidates = ["/opt/homebrew/bin/python3.14", "/opt/homebrew/bin/python3.13", "/opt/homebrew/bin/python3.12", "/opt/homebrew/bin/python3",
+                          "/usr/local/bin/python3.13", "/usr/local/bin/python3.12", "/usr/local/bin/python3"]
+        // python.org's installers and uv's managed Pythons, newest first
+        let fm = FileManager.default
+        let fw = "/Library/Frameworks/Python.framework/Versions"
+        for v in ((try? fm.contentsOfDirectory(atPath: fw)) ?? []).sorted(by: >) { candidates.append("\(fw)/\(v)/bin/python3") }
+        let uv = NSHomeDirectory() + "/.local/share/uv/python"
+        for v in ((try? fm.contentsOfDirectory(atPath: uv)) ?? []).filter({ $0.hasPrefix("cpython-3") }).sorted(by: >) { candidates.append("\(uv)/\(v)/bin/python3") }
+        candidates.append("python3")
+        for c in candidates {
+            if c.hasPrefix("/") && !FileManager.default.isExecutableFile(atPath: c) { continue }
+            let r = await Runner.capture([c, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"])
+            let v = r.out.trimmingCharacters(in: .whitespacesAndNewlines)
+            let parts = v.split(separator: ".").compactMap { Int($0) }
+            if r.status == 0, parts.count == 2, parts[0] == 3, parts[1] >= 12 { return (c, "Python " + v) }
+        }
+        return nil
+    }
+
+    /// PATH for the build and the phone copy: HookLink's Python first, so every tool the engine starts with python3 gets the packages
+    var toolEnv: [String: String] { ["PATH": support.appendingPathComponent("venv/bin").path + ":" + Runner.path] }
+
     /// Installs what the checks found missing. Homebrew and Xcode themselves are the player's to install.
     func installTools() async {
         busy = true; defer { busy = false }
@@ -170,8 +197,9 @@ final class HookLink: ObservableObject {
             await r.run(["brew", "install", "xcodegen", "zstd", "glslang", "python@3.13"]) { self.say($0) }
         }
         if !FileManager.default.fileExists(atPath: venvPython.path) {
-            say("$ python3 -m venv \(support.appendingPathComponent("venv").path)")
-            await r.run(["python3", "-m", "venv", support.appendingPathComponent("venv").path]) { self.say($0) }
+            guard let py = await findPython() else { say("No Python 3.12 or newer was found, so HookLink's packages cannot be installed. Check that Homebrew installed python@3.13."); await runChecks(); return }
+            say("$ \(py.path) -m venv \(support.appendingPathComponent("venv").path)")
+            await r.run([py.path, "-m", "venv", support.appendingPathComponent("venv").path]) { self.say($0) }
         }
         say("$ pip install (the build's Python packages)")
         await r.run([venvPython.path, "-m", "pip", "install", "--upgrade", "lz4", "capstone>=5,<6", "fonttools", "nsz", "zbic",
@@ -207,7 +235,7 @@ final class HookLink: ObservableObject {
         say("$ " + args.joined(separator: " "))
         let r = Runner(); runner = r
         var collectingDamaged = false
-        let status = await r.run(args, cwd: engine, env: ["DM_ENTITLEMENTS": resources.appendingPathComponent("presets/entitlements.plist").path]) { line in
+        let status = await r.run(args, cwd: engine, env: toolEnv.merging(["DM_ENTITLEMENTS": resources.appendingPathComponent("presets/entitlements.plist").path]) { a, _ in a }) { line in
             guard let data = line.data(using: .utf8), let ev = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let kind = ev["ev"] as? String else {
                 self.say(line)
                 if collectingDamaged, line.hasPrefix("  ") { self.damagedFiles.append(line.trimmingCharacters(in: .whitespaces)) } else { collectingDamaged = false }
@@ -235,8 +263,13 @@ final class HookLink: ObservableObject {
                 }
             case "game":
                 let text = String(decoding: data, as: UTF8.self)
-                if !text.uppercased().contains(Game.titleID) {
+                let title = (ev["title_id"] as? String ?? text).uppercased()
+                let version = "\(ev["version"] ?? "")"
+                if !title.contains(Game.titleID) {
                     self.buildError = "This is not Ocarina of Time (Nintendo Switch 2 Edition, \(Game.titleID)). HookLink builds only that game."
+                    r.cancel()
+                } else if !version.isEmpty && !version.contains(Game.version.dropFirst()) {
+                    self.buildError = "This game is at version \(version). HookLink supports only update \(Game.version). Update the game on your Switch 2, dump it again, and try again."
                     r.cancel()
                 }
             default: self.say(line)
@@ -295,7 +328,7 @@ final class HookLink: ObservableObject {
         }
 
         copyStatus.append("Copying the game files (about 24 GB). This takes 10 to 20 minutes…")
-        let push = await r.run(["bash", engine.appendingPathComponent("scripts/push_romfs.sh").path, d.id, bundleID, romfsImage.path], cwd: engine) { self.say($0) }
+        let push = await r.run(["bash", engine.appendingPathComponent("scripts/push_romfs.sh").path, d.id, bundleID, romfsImage.path], cwd: engine, env: toolEnv) { self.say($0) }
         guard push == 0 else { copyStatus.append("✗ The game files did not copy. Check the cable and that the phone is unlocked, then try again."); return }
         copyStatus.append("✓ Game files copied")
 
@@ -316,6 +349,24 @@ final class HookLink: ObservableObject {
             copyStatus.append("⚠ Your dump has \(damagedFiles.count) damaged file(s). The game may show a missing texture there; dumping the game again fixes it.")
         }
         copyOK = same
+    }
+
+    /// Copies the game's log (and the previous run's) from the phone to the Desktop, for a bug report. The log holds no game data.
+    @Published var logStatus = ""
+    func fetchLog() async {
+        if device == nil || bundleID.isEmpty { await findDevices() }
+        guard let d = device, !bundleID.isEmpty else { logStatus = "Plug in your iPhone with the game installed, unlock it, and try again."; return }
+        busy = true; defer { busy = false }
+        let desk = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
+        var got: [URL] = []
+        for (src, name) in [("Documents/log.txt", "HookLink-log.txt"), ("Documents/log.prev.txt", "HookLink-log-previous.txt")] {
+            let dst = desk.appendingPathComponent(name); try? FileManager.default.removeItem(at: dst)
+            let st = await Runner().run(["xcrun", "devicectl", "device", "copy", "from", "--device", d.id, "--domain-type", "appDataContainer",
+                                         "--domain-identifier", bundleID, "--source", src, "--destination", dst.path]) { self.say($0) }
+            if st == 0, FileManager.default.fileExists(atPath: dst.path) { got.append(dst) }
+        }
+        if got.isEmpty { logStatus = "No log yet: open the game once, then try again." }
+        else { logStatus = "Saved \(got.map(\.lastPathComponent).joined(separator: " and ")) on your Desktop. Attach it to your issue."; NSWorkspace.shared.activateFileViewerSelecting(got) }
     }
 
     func cancel() { runner?.cancel() }

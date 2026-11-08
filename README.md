@@ -8,6 +8,8 @@
 <a href="#project-status">Status</a> · <a href="#how-to-build">How to build</a> · <a href="#installing-and-copying-the-game">Install</a> · <a href="#what-hookLink-tunes-for-the-iphone">What it tunes</a> · <a href="#if-something-goes-wrong">Problems</a> · <a href="#want-to-help">Help</a> · <a href="#credits">Credits</a> · <a href="#license">License</a>
 </p>
 
+Discord: https://discord.gg/bSrN5kEScg
+
 HookLink is a Mac app that turns your own dump of Ocarina of Time into an iPhone app. It runs [nxnative](https://github.com/seedds/nxnative), which translates the game's code and its graphics to Apple's Metal, with changes made and tested for this one game on the iPhone: faster pipeline loading, memory fixes, real-time game speed below 60 fps, and a resolution tuned for the phone. No emulator is involved.
 
 > [!IMPORTANT]
@@ -96,7 +98,7 @@ Updating to a newer HookLink build? Install the new IPA over the old one. Your s
 | The game closes at start | Copy the game files again from HookLink; make sure Increased Memory Limit is on |
 | Stutter the first time somewhere | Normal: the next start prepares that area |
 
-Still stuck? [Open an issue](../../issues) with your iPhone model, iOS version, where you were in the game and what happened. A screenshot or video helps. **Never attach game files.**
+Still stuck? Click **Get game log** on HookLink's last step, then [open an issue](../../issues) or ask on [Discord](https://discord.gg/bSrN5kEScg) with your iPhone model, iOS version, where you were in the game and what happened. A screenshot or video helps. **Never attach game files.**
 
 ## Want to help?
 

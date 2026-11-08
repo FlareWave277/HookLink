@@ -256,6 +256,7 @@ struct CopyPage: View {
 }
 
 struct DonePage: View {
+    @EnvironmentObject var app: HookLink
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             PageTitle(title: "Play", subtitle: "Open the game on your iPhone.")
@@ -264,8 +265,19 @@ struct DonePage: View {
                 Text("• A new area can stutter the first time you enter it. The next start prepares it, and it runs smoothly after that.")
                 Text("• The phone gets warm in long sessions; it runs best unplugged and not in a case.")
             }
-            Text("Problems? Open an issue on HookLink's GitHub page with your iPhone model, where you were in the game and what happened. Never attach game files.")
-                .foregroundStyle(.secondary)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Something wrong?").font(.headline)
+                    Text("Plug in your iPhone and click Get game log. It saves the game's log on your Desktop; attach it to an issue on HookLink's GitHub page with your iPhone model and where you were in the game. The log holds no game files.")
+                    HStack {
+                        Button("Get game log") { Task { await app.fetchLog() } }.disabled(app.busy)
+                        Link("Report a problem", destination: URL(string: "https://github.com/dsi-hub/HookLink/issues/new/choose")!)
+                        Link("Discord", destination: URL(string: "https://discord.gg/bSrN5kEScg")!)
+                        if app.busy { ProgressView().controlSize(.small) }
+                    }
+                    if !app.logStatus.isEmpty { Text(app.logStatus).foregroundStyle(.secondary) }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+            }
         }
     }
 }

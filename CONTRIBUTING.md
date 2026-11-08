@@ -85,6 +85,6 @@ HookLink is under the MIT License. By sending a change you agree to license it u
 ## Where to talk
 
 - Issues: on this repository.
-- Discord: *(link coming soon)*
+- Discord: https://discord.gg/bSrN5kEScg
 
 Thanks for testing, reporting and sending fixes.
