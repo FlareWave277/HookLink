@@ -13,6 +13,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 190, ideal: 210)
         } detail: {
             VStack(spacing: 0) {
+                if app.engineUpdate != nil || app.appUpdate != nil || !app.updateMessage.isEmpty { UpdateBanner(); Divider() }
                 ScrollView { page.padding(28).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading) }
                 Divider()
                 HStack {
@@ -25,6 +26,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 860, minHeight: 600)
+        .task { await app.checkForUpdates() }   // at every launch: quiet when offline
     }
 
     var canGoOn: Bool {

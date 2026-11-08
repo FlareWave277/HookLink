@@ -5,7 +5,7 @@
 <p align="center"><b>The Legend of Zelda: Ocarina of Time (Nintendo Switch 2 Edition) on your iPhone, natively, built on your Mac from your own copy of the game.</b></p>
 
 <p align="center">
-<a href="#project-status">Status</a> · <a href="#how-to-build">How to build</a> · <a href="#installing-and-copying-the-game">Install</a> · <a href="#what-hookLink-tunes-for-the-iphone">What it tunes</a> · <a href="#if-something-goes-wrong">Problems</a> · <a href="#want-to-help">Help</a> · <a href="#credits">Credits</a> · <a href="#license">License</a>
+<a href="#project-status">Status</a> · <a href="#how-to-build">How to build</a> · <a href="#installing-and-copying-the-game">Install</a> · <a href="#updating">Updating</a> · <a href="#what-hookLink-tunes-for-the-iphone">What it tunes</a> · <a href="#if-something-goes-wrong">Problems</a> · <a href="#want-to-help">Help</a> · <a href="#credits">Credits</a> · <a href="#license">License</a>
 </p>
 
 Discord: https://discord.gg/bSrN5kEScg
@@ -77,7 +77,12 @@ The IPA holds the app, its shaders and its GPU pipeline archive (about 6 GB). Th
 3. In HookLink, **Copy game files**: plug in your iPhone, unlock it, tap **Trust**, then click the button. HookLink copies the game files and the iPhone resolution file made from your game, then checks them.
 4. Open the game.
 
-Updating to a newer HookLink build? Install the new IPA over the old one. Your saves and game files stay; you don't need to copy them again.
+## Updating
+
+HookLink checks for updates every time you open it (and from **HookLink → Check for Updates…**):
+
+- **A game update** (performance and fixes): click **Update and rebuild**, then build again. Small updates rebuild in minutes; updates that change the shaders take a few hours. Install the new IPA over the old one: your saves, game files and resolution file stay on the phone, so there's nothing to copy again.
+- **A new HookLink version**: download it from the Releases page and replace the old app.
 
 ## What HookLink tunes for the iPhone
 

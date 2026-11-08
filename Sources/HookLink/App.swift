@@ -16,6 +16,11 @@ struct HookLinkApp: App {
                 }
         }
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { Task { await app.checkForUpdates(); if app.engineUpdate == nil && app.appUpdate == nil { app.updateMessage = "HookLink and the game engine are up to date." } } }
+            }
+        }
         Settings { SettingsView().environmentObject(app) }
     }
 }

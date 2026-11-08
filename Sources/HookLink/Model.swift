@@ -84,6 +84,12 @@ final class HookLink: ObservableObject {
     @Published var copyStatus: [String] = []
     @Published var copyOK = false
 
+    // Updates (Updates.swift)
+    @Published var engineUpdate: EngineUpdate? = nil
+    @Published var appUpdate: AppUpdate? = nil
+    @Published var updateMessage = ""
+    @AppStorage("lastUpdateCheck") var lastUpdateCheck: Double = 0
+
     private var runner: Runner?
 
     // MARK: Paths
