@@ -245,7 +245,13 @@ struct CopyPage: View {
                         Text("The game is not installed on this iPhone yet. Install it first (previous step), then click Find my iPhone again.").foregroundStyle(.orange)
                     } else {
                         Label("Game found on \(d.name)", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                        Button("Copy game files to my iPhone") { Task { await app.copyToPhone() } }.buttonStyle(.borderedProminent).controlSize(.large).disabled(app.busy)
+                        Text("Before copying: Settings → Display & Brightness → Auto-Lock → Never, and keep the phone unlocked. Set it back afterwards.")
+                            .font(.callout).foregroundStyle(.secondary)
+                        HStack {
+                            Button("Copy game files to my iPhone") { Task { await app.copyToPhone() } }.buttonStyle(.borderedProminent).controlSize(.large).disabled(app.busy)
+                            Button("Copy with Finder instead") { app.prepareFinderCopy() }.disabled(app.busy)
+                        }
+                        if app.finderMode { FinderSteps() }
                     }
                 }
             }
@@ -316,5 +322,30 @@ struct SettingsView: View {
             TextField("Engine folder (for development)", text: $app.enginePathSetting)
             Text("Leave empty to use the engine HookLink downloads.").font(.caption).foregroundStyle(.secondary)
         }.padding(20).frame(width: 520)
+    }
+}
+
+
+/// The Finder way to copy the game files, step by step, then HookLink checks them and does the rest
+struct FinderSteps: View {
+    @EnvironmentObject var app: HookLink
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Copy with Finder").font(.headline)
+                Text("Finder uses another way to reach your iPhone, so it works when the cable copy keeps stopping.").foregroundStyle(.secondary)
+                Label("A Finder window shows romfs.img, your game files (about 26 GB). It takes no extra disk space.", systemImage: "1.circle")
+                Label("Open a second Finder window and click your iPhone in the sidebar, under Locations.", systemImage: "2.circle")
+                Label("Click the Files tab, and find The Legend of Zelda: Ocarina of Time.", systemImage: "3.circle")
+                Label("Drag romfs.img onto the game's name. If Finder asks, choose Replace.", systemImage: "4.circle")
+                Label("Wait for Finder's progress to finish (15 to 25 minutes). Keep the phone unlocked, and don't open the game yet.", systemImage: "5.circle")
+                HStack {
+                    Button("Show romfs.img in Finder") { app.prepareFinderCopy() }
+                    Button("Finder is done: check and finish") { Task { await app.copyToPhone(viaFinder: true) } }
+                        .buttonStyle(.borderedProminent).disabled(app.busy)
+                }
+                Text("HookLink then checks the game files arrived whole, and copies and checks the resolution file.").font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+        }
     }
 }

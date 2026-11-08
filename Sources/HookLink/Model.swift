@@ -354,7 +354,11 @@ final class HookLink: ObservableObject {
         }
     }
 
-    func copyToPhone() async {
+    /// Copies the game files and the resolution file to the phone, then checks them. viaFinder: the player copied the game files
+    /// with Finder (see prepareFinderCopy), so this checks they arrived whole instead of copying them, and goes on with the rest.
+    /// devicectl's single 24 GB copy dropped part way on the tested iPhone (about 2.5 minutes in, even awake on a new cable); after
+    /// two tries HookLink offers the Finder way, which uses another transfer service and the app's file sharing.
+    func copyToPhone(viaFinder: Bool = false) async {
         guard let d = device, !bundleID.isEmpty else { return }
         busy = true; copyOK = false; copyStatus = []; defer { busy = false; endWork() }
         beginWork("Copying to your iPhone", steps: 3)
@@ -363,24 +367,46 @@ final class HookLink: ObservableObject {
         func dc(_ way: String, _ rest: [String]) -> [String] {
             ["xcrun", "devicectl", "device", "copy", way, "--device", d.id, "--domain-type", "appDataContainer", "--domain-identifier", bundleID] + rest
         }
+        let bytes = Int64((try? romfsImage.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
 
-        copyStatus.append("Copying the game files (about 24 GB). This takes 10 to 20 minutes…")
-        // devicectl reports no progress: estimate it from the image's size at about 35 MB/s (measured over a cable), capped at 95% until done
-        workStep(1, "Game files", fraction: 0, estimated: true)
-        let bytes = Double((try? romfsImage.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 24_000_000_000)
-        let expect = max(60, bytes / 35_000_000), t0 = Date()
-        let ticker = Task { @MainActor in
-            while !Task.isCancelled {
-                let el = Date().timeIntervalSince(t0)
-                self.workFraction(min(0.95, el / expect), eta: HookLink.hms(max(0, expect - el)))
-                try? await Task.sleep(for: .seconds(1))
+        if viaFinder {
+            workStep(1, "Checking the game files you copied with Finder")
+            let onPhone = await phoneFileSize(d, "romfs.img")
+            guard let onPhone, onPhone == bytes, bytes > 0 else {
+                copyStatus.append(onPhone == nil
+                    ? "✗ romfs.img isn't on the phone yet. Drag it onto the game in Finder's Files tab, wait for Finder to finish, then click Check again."
+                    : "✗ romfs.img on the phone is \(HookLink.gb(onPhone ?? 0)), not \(HookLink.gb(bytes)): Finder hasn't finished, or the copy stopped. Wait for Finder's progress to finish (or drag it again and choose Replace), then click Check again.")
+                return
             }
+            copyStatus.append("✓ Game files are on your iPhone (\(HookLink.gb(bytes)))")
+            finderMode = false
+        } else {
+            copyStatus.append("Copying the game files (about 24 GB). This takes 10 to 20 minutes…")
+            var push: Int32 = -1
+            for attempt in 1...2 {
+                // devicectl reports no progress: estimate it from the image's size at about 35 MB/s (measured over a cable), capped at 95% until done
+                workStep(1, attempt == 1 ? "Game files" : "Game files (trying again)", fraction: 0, estimated: true)
+                let expect = max(60, Double(bytes) / 35_000_000), t0 = Date()
+                let ticker = Task { @MainActor in
+                    while !Task.isCancelled {
+                        let el = Date().timeIntervalSince(t0)
+                        self.workFraction(min(0.95, el / expect), eta: HookLink.hms(max(0, expect - el)))
+                        try? await Task.sleep(for: .seconds(1))
+                    }
+                }
+                push = await r.run(["bash", engine.appendingPathComponent("scripts/push_romfs.sh").path, d.id, bundleID, romfsImage.path], cwd: engine, env: toolEnv) { self.say($0) }
+                ticker.cancel()
+                if push == 0 { break }
+                if attempt == 1 { copyStatus.append("The copy stopped part way. Trying once more…") }
+            }
+            guard push == 0 else {
+                copyStatus.append("✗ The game files didn't copy over the cable. Use Copy with Finder instead, below: it uses another way to reach the phone.")
+                finderMode = true
+                return
+            }
+            workFraction(1)
+            copyStatus.append("✓ Game files copied")
         }
-        defer { ticker.cancel() }
-        let push = await r.run(["bash", engine.appendingPathComponent("scripts/push_romfs.sh").path, d.id, bundleID, romfsImage.path], cwd: engine, env: toolEnv) { self.say($0) }
-        guard push == 0 else { copyStatus.append("✗ The game files did not copy. Check the cable and that the phone is unlocked, then try again."); return }
-        ticker.cancel(); workFraction(1)
-        copyStatus.append("✓ Game files copied")
 
         workStep(2, "Resolution file")
         copyStatus.append("Making the iPhone resolution file from your game…")
@@ -391,17 +417,52 @@ final class HookLink: ObservableObject {
         guard up == 0 else { copyStatus.append("✗ The resolution file did not copy."); return }
 
         workStep(3, "Checking")
-        // Check: read it back and compare
+        // Check: read it back and compare; and the game files' size once more
         let back = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-check.pack.zs")
         try? FileManager.default.removeItem(at: back)
         _ = await r.run(dc("from", ["--source", "Documents/res_overlay/Pack/Bootup.Nin_Ounce_NVN2.pack.zs", "--destination", back.path])) { self.say($0) }
         let same = (try? Data(contentsOf: back)) == (try? Data(contentsOf: overlayFile))
         copyStatus.append(same ? "✓ Resolution file copied and checked" : "✗ The resolution file on the phone does not match. Try again.")
+        let romOK = await phoneFileSize(d, "romfs.img") == bytes
+        if !romOK { copyStatus.append("✗ The game files on the phone aren't complete. Copy them again.") }
         if !damagedFiles.isEmpty {
             copyStatus.append("⚠ Your dump has \(damagedFiles.count) damaged file(s). The game may show a missing texture there; dumping the game again fixes it.")
         }
-        copyOK = same
+        copyOK = same && romOK
     }
+
+    /// The Finder way: the game files under the name the game reads (romfs.img, as a hard link: no extra disk space), shown in Finder
+    @Published var finderMode = false
+    @Published var finderFile: URL? = nil
+    func prepareFinderCopy() {
+        finderMode = true
+        let dir = folder.appendingPathComponent("copy-to-phone"), link = dir.appendingPathComponent("romfs.img")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: link)
+        do { try FileManager.default.linkItem(at: romfsImage, to: link) }
+        catch {   // another drive: a hard link can't cross volumes, so copy it (needs the space)
+            do { try FileManager.default.copyItem(at: romfsImage, to: link) }
+            catch { copyStatus = ["✗ Couldn't prepare the file for Finder: \(error.localizedDescription)"]; return }
+        }
+        finderFile = link
+        NSWorkspace.shared.activateFileViewerSelecting([link])
+    }
+
+    /// The size of a file in the game's Documents folder on the phone, or nil when it isn't there
+    func phoneFileSize(_ d: Device, _ name: String) async -> Int64? {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-files.json")
+        try? FileManager.default.removeItem(at: tmp)
+        _ = await Runner.capture(["xcrun", "devicectl", "device", "info", "files", "--device", d.id, "--domain-type", "appDataContainer",
+                                  "--domain-identifier", bundleID, "--subdirectory", "Documents", "--json-output", tmp.path])
+        guard let data = try? Data(contentsOf: tmp), let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let files = (root["result"] as? [String: Any])?["files"] as? [[String: Any]] else { return nil }
+        for f in files where (f["relativePath"] as? String) == name || (f["name"] as? String) == name {
+            if let m = f["metadata"] as? [String: Any], let n = m["size"] as? NSNumber { return n.int64Value }
+        }
+        return nil
+    }
+
+    static func gb(_ b: Int64) -> String { String(format: "%.2f GB", Double(b) / 1e9) }
 
     /// Copies the game's log (and the previous run's) from the phone to the Desktop, for a bug report. The log holds no game data.
     @Published var logStatus = ""
