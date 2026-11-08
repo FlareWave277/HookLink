@@ -31,28 +31,21 @@ final class Runner {
         p.environment = e
         let pipe = Pipe()
         p.standardOutput = pipe; p.standardError = pipe
+        // The exit status arrives through terminationHandler, set before run so it can't be missed. waitUntilExit spins the
+        // calling thread's run loop and waited for good on Swift's cooperative threads when the program had already ended
+        let (exits, exitTo) = AsyncStream.makeStream(of: Int32.self, bufferingPolicy: .bufferingNewest(1))
+        p.terminationHandler = { exitTo.yield($0.terminationStatus); exitTo.finish() }
         process = p
         do { try p.run() } catch {
             await onLine("Could not start \(args.first ?? "?"): \(error.localizedDescription)")
             return -1
         }
-        let handle = pipe.fileHandleForReading
-        var buffer = Data()
-        while true {
-            let chunk = handle.availableData
-            if chunk.isEmpty { break }
-            buffer.append(chunk)
-            while let nl = buffer.firstIndex(of: 0x0a) {
-                let lineData = buffer.subdata(in: buffer.startIndex..<nl)
-                buffer.removeSubrange(buffer.startIndex...nl)
-                let line = String(decoding: lineData, as: UTF8.self)
-                await onLine(line)
-            }
-        }
-        if !buffer.isEmpty { await onLine(String(decoding: buffer, as: UTF8.self)) }
-        p.waitUntilExit()
+        // Output, line by line, without blocking one of Swift's shared threads while the program runs
+        do { for try await line in pipe.fileHandleForReading.bytes.lines { await onLine(line) } } catch {}
+        var status: Int32 = -1
+        for await st in exits { status = st; break }
         process = nil
-        return p.terminationStatus
+        return status
     }
 
     /// Runs a command and returns its whole output (for quick checks).
