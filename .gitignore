@@ -1,0 +1,30 @@
+# Build output
+.build/
+dist/
+*.xcodeproj/xcuserdata/
+.DS_Store
+__pycache__/
+
+# Game data and anything made from it: never commit these
+*.nup
+*.nsp
+*.xci
+*.nsz
+*.xcz
+*.nca
+*.nso
+*.ipa
+*.img
+*.mtl4a
+*.metallib
+*.zs
+*.bntx
+*.bfres
+*.keys
+prod.keys
+title.keys
+romfs/
+exefs/
+build/
+pso_archive/
+res_overlay/
