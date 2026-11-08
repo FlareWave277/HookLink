@@ -109,6 +109,7 @@ Still stuck? Click **Get game log** on HookLink's last step, then [open an issue
 
 - **Test on another iPhone**, especially an iPhone 17 model, and report how it runs.
 - **Play further** than anyone has, and report what breaks.
+- **Share your pipeline list**: in HookLink, **Play → Share my pipeline list**. Lists from different players are merged into the next update, so everyone's game prepares more of the world ahead of time and stutters less.
 - **Send a fix**: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits

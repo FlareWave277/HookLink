@@ -280,6 +280,17 @@ struct DonePage: View {
                     if !app.logStatus.isEmpty { Text(app.logStatus).foregroundStyle(.secondary) }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
             }
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Help everyone's game run smoother").font(.headline)
+                    Text("Every area you play adds to your phone's pipeline list: the graphics setups it had to prepare. Shared lists go into the next update, so other players' games prepare those areas ahead of time instead of stuttering. The list holds identifiers and settings only, never game files or anything personal.")
+                    HStack {
+                        Button("Share my pipeline list") { Task { await app.sharePipelines() } }.disabled(app.busy)
+                        if app.busy { ProgressView().controlSize(.small) }
+                    }
+                    if !app.shareStatus.isEmpty { Text(app.shareStatus).foregroundStyle(.secondary) }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+            }
         }
     }
 }

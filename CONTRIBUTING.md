@@ -12,6 +12,8 @@ HookLink builds The Legend of Zelda: Ocarina of Time (Nintendo Switch 2 Edition)
 - edited game files, such as the resolution file (`Bootup.Nin_Ounce_NVN2.pack.zs`): HookLink makes it on each player's Mac from their own game;
 - saves and anything copied off a phone.
 
+**The one exception: pipeline lists** (`HookLink-pipelines-<date>.txt`, from **Share my pipeline list**). They hold shader identifiers and drawing settings only, the same kind of list nxnative ships in its own code, and they're how the game learns to prepare more areas for everyone. Share them through the *Share my pipeline list* issue form.
+
 Don't open an issue or a pull request asking where to get the game or keys, or for someone else's files. Screenshots, videos and the game's `log.txt` are fine and often needed; the log holds no game data.
 
 `.gitignore` blocks most of these. Still check `git status` before every commit. If you're not sure whether a file is game data, leave it out.

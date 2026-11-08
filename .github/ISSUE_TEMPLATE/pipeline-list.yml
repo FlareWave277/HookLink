@@ -1,0 +1,22 @@
+name: Share my pipeline list
+description: Help everyone's game prepare more areas ahead of time
+title: "Pipeline list: "
+labels: [pipelines]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! In HookLink, **Play → Share my pipeline list** saved a file named `HookLink-pipelines-<date>.txt` on your Desktop. Drag it into the box below.
+        The file holds shader identifiers and drawing settings only, no game files. **Don't attach anything else from your phone or your game.**
+  - type: input
+    id: iphone
+    attributes: { label: iPhone model, placeholder: "iPhone 18 Pro Max" }
+    validations: { required: true }
+  - type: textarea
+    id: areas
+    attributes: { label: Where you played, description: "Areas, dungeons or cutscenes this list covers, as far as you know.", placeholder: "Kakariko Village, Death Mountain Trail, Dodongo's Cavern" }
+    validations: { required: true }
+  - type: textarea
+    id: file
+    attributes: { label: Your pipeline list, description: "Drag HookLink-pipelines-<date>.txt here." }
+    validations: { required: true }

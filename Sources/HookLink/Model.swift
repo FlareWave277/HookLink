@@ -375,6 +375,31 @@ final class HookLink: ObservableObject {
         else { logStatus = "Saved \(got.map(\.lastPathComponent).joined(separator: " and ")) on your Desktop. Attach it to your issue."; NSWorkspace.shared.activateFileViewerSelecting(got) }
     }
 
+    /// Saves the phone's pipeline list (Documents/pso_user.tsv) on the Desktop for sharing, and opens the GitHub form for it.
+    /// The list holds shader identifiers and drawing settings only (what nxnative ships in its own lists), never game files.
+    /// Only S, R and C rows are kept, so nothing else from the file can leave the Mac.
+    @Published var shareStatus = ""
+    func sharePipelines() async {
+        if device == nil || bundleID.isEmpty { await findDevices() }
+        guard let d = device, !bundleID.isEmpty else { shareStatus = "Plug in your iPhone with the game installed, unlock it, and try again."; return }
+        busy = true; defer { busy = false }
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-pso_user.tsv")
+        try? FileManager.default.removeItem(at: tmp)
+        _ = await Runner().run(["xcrun", "devicectl", "device", "copy", "from", "--device", d.id, "--domain-type", "appDataContainer",
+                                "--domain-identifier", bundleID, "--source", "Documents/pso_user.tsv", "--destination", tmp.path]) { self.say($0) }
+        guard let text = try? String(contentsOf: tmp, encoding: .utf8) else { shareStatus = "No pipeline list yet: play the game for a while first, then try again."; return }
+        let rows = text.split(separator: "\n").filter { l in l.count > 2 && "SRC".contains(l.first!) && l.dropFirst().first == "\t" }
+        guard !rows.isEmpty else { shareStatus = "No pipeline list yet: play the game for a while first, then try again."; return }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let out = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0].appendingPathComponent("HookLink-pipelines-\(f.string(from: Date())).txt")
+        let header = "# HookLink pipeline list: \(d.model), HookLink \(AppInfo.version), \(Game.titleID) \(Game.version)\n"
+        do { try (header + rows.joined(separator: "\n") + "\n").write(to: out, atomically: true, encoding: .utf8) }
+        catch { shareStatus = "Could not save the list: \(error.localizedDescription)"; return }
+        shareStatus = "Saved \(out.lastPathComponent) on your Desktop (\(rows.count) entries). Attach it to the form that just opened. Thank you!"
+        NSWorkspace.shared.activateFileViewerSelecting([out])
+        if let u = URL(string: "https://github.com/\(AppInfo.repo)/issues/new?template=pipeline-list.yml") { NSWorkspace.shared.open(u) }
+    }
+
     func cancel() { runner?.cancel() }
 
     static func hms(_ s: Double) -> String {
