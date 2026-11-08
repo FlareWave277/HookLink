@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.1.0 (first release, pre-release)
+## 1.1
+
+**Fixed: the game crashed on its first frame after "Preparing shaders", on every launch.**
+The patch that keeps the game at real speed when frames run long has two jumps that skip to the game's own code while the frame pacing isn't decided yet, which is the case on the very first frames. Extra instructions added for the real-speed fix sat between those jumps and their target, so the jumps landed in the middle of the new code and the game crashed (an access at address 0x3c). The jumps are now computed from the code instead of fixed, a check stops the build if they ever don't line up, and a new test runs the patch on an ARM emulator for the first frames, 60 fps, slow frames, the 30 fps step and the pacing turned off.
+
+**To update:** open HookLink and click **Update and rebuild** on the update banner, then install the new app over the old one. Your saves and game files stay on the phone.
+
+## 1.0
 
 The first version of HookLink, tested on one Mac and one iPhone 18 Pro Max (iOS 27.2).
 
