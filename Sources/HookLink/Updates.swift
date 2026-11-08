@@ -13,28 +13,41 @@ extension HookLink {
         ProcessInfo.processInfo.environment["HOOKLINK_ENGINE"].map { $0.isEmpty } ?? true && enginePathSetting.isEmpty
     }
 
-    /// Looks for a newer engine and a newer HookLink. Quiet when offline or when GitHub can't be reached.
+    /// Looks for a newer engine and a newer HookLink. The version panel shows the outcome: up to date, an update, or that the check failed.
     func checkForUpdates() async {
         updateMessage = ""
-        await checkEngine()
-        await checkApp()
-        lastUpdateCheck = Date().timeIntervalSince1970
+        checkState = .checking
+        await readEngineVersion()
+        let engineOK = await checkEngine()
+        let appOK = await checkApp()
+        if engineOK && appOK { lastUpdateCheck = Date().timeIntervalSince1970; checkState = .done }
+        else { checkState = .failed(appOK ? "Couldn't reach the engine's download address" : "Couldn't reach GitHub") }
     }
 
-    func checkEngine() async {
+    /// The engine this Mac has: its commit and the commit's date, for the version panel
+    func readEngineVersion() async {
+        guard FileManager.default.fileExists(atPath: engine.appendingPathComponent(".git").path) else { engineVersion = nil; return }
+        let r = await Runner.capture(["git", "-C", engine.path, "log", "-1", "--format=%h|%cs"])
+        let parts = r.out.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "|").map(String.init)
+        engineVersion = r.status == 0 && parts.count == 2 ? EngineVersion(commit: parts[0], date: parts[1], managed: engineIsManaged) : nil
+    }
+
+    /// false when the engine's remote couldn't be reached (no network, GitHub down); true when checked, or nothing to check
+    @discardableResult
+    func checkEngine() async -> Bool {
         engineUpdate = nil
-        guard engineIsManaged, FileManager.default.fileExists(atPath: engine.appendingPathComponent(".git").path) else { return }
+        guard engineIsManaged, FileManager.default.fileExists(atPath: engine.appendingPathComponent(".git").path) else { return true }
         let cfg = Engine.load(from: resources)
-        guard !cfg.repo.isEmpty else { return }
+        guard !cfg.repo.isEmpty else { return true }
         let dir = engine.path
         // The remote and branch can change between HookLink versions: follow engine.json
         _ = await Runner.capture(["git", "-C", dir, "remote", "set-url", "origin", cfg.repo])
         let f = await Runner.capture(["git", "-C", dir, "fetch", "--quiet", "--depth", "50", "origin",
                                       "+refs/heads/\(cfg.branch):refs/remotes/origin/\(cfg.branch)"])
-        guard f.status == 0 else { return }
+        guard f.status == 0 else { return false }
         let here = (await Runner.capture(["git", "-C", dir, "rev-parse", "HEAD"])).out.trimmingCharacters(in: .whitespacesAndNewlines)
         let there = (await Runner.capture(["git", "-C", dir, "rev-parse", "origin/\(cfg.branch)"])).out.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !there.isEmpty, here != there else { return }
+        guard !there.isEmpty, here != there else { return true }
         // What's new: the commits the update brings (subjects only, newest first); a rebased branch shows its newest commits
         var log = (await Runner.capture(["git", "-C", dir, "log", "--format=%s", "-n", "15", "HEAD..origin/\(cfg.branch)"])).out
         if log.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -44,20 +57,24 @@ extension HookLink {
             let t = String(s); return t.count > 140 ? String(t.prefix(140)) + "…" : t
         }
         engineUpdate = EngineUpdate(commit: String(there.prefix(12)), changes: items)
+        return true
     }
 
-    func checkApp() async {
+    /// false when GitHub couldn't be reached; true when checked
+    @discardableResult
+    func checkApp() async -> Bool {
         appUpdate = nil
-        guard let url = URL(string: "https://api.github.com/repos/\(AppInfo.repo)/releases/latest") else { return }
+        guard let url = URL(string: "https://api.github.com/repos/\(AppInfo.repo)/releases/latest") else { return true }
         var req = URLRequest(url: url); req.timeoutInterval = 10
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        guard let (data, resp) = try? await URLSession.shared.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200,
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = obj["tag_name"] as? String else { return }
+        guard let (data, resp) = try? await URLSession.shared.data(for: req), let code = (resp as? HTTPURLResponse)?.statusCode else { return false }
+        guard code == 200, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tag = obj["tag_name"] as? String else { return code == 404 }   // 404: no release yet, nothing newer
         let latest = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
         if AppInfo.isNewer(latest, than: AppInfo.version) {
             appUpdate = AppUpdate(version: latest, page: (obj["html_url"] as? String) ?? "https://github.com/\(AppInfo.repo)/releases/latest")
         }
+        return true
     }
 
     /// Moves the engine to the fetched branch. The player then builds again and installs the new IPA over the old one:
@@ -71,6 +88,7 @@ extension HookLink {
         let st = await Runner().run(["git", "-C", engine.path, "reset", "--hard", "origin/\(cfg.branch)"]) { self.say($0) }
         if st == 0 {
             engineUpdate = nil
+            await readEngineVersion()
             buildOK = false
             updateMessage = "The engine is updated. Build again, then install the new app over the old one: your saves and game files stay on your phone."
             step = .build
@@ -81,6 +99,8 @@ extension HookLink {
 }
 
 struct EngineUpdate: Equatable { let commit: String; let changes: [String] }
+struct EngineVersion: Equatable { let commit: String; let date: String; let managed: Bool }
+enum CheckState: Equatable { case never, checking, done, failed(String) }
 struct AppUpdate: Equatable { let version: String; let page: String }
 
 enum AppInfo {
@@ -132,5 +152,61 @@ struct UpdateBanner: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5))
+    }
+}
+
+
+/// Always at the bottom of the sidebar: which HookLink and engine this Mac has, whether each is up to date, and when it was last checked
+struct VersionPanel: View {
+    @EnvironmentObject var app: HookLink
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            VStack(alignment: .leading, spacing: 5) {
+                row("HookLink \(AppInfo.version)", update: app.appUpdate.map { "\($0.version) available" }) {
+                    if let u = app.appUpdate, let url = URL(string: u.page) { NSWorkspace.shared.open(url) }
+                }
+                if let e = app.engineVersion {
+                    row("Engine \(e.commit) (\(e.date))" + (e.managed ? "" : ", your folder"), update: app.engineUpdate != nil ? "update available" : nil) {
+                        app.updateMessage = ""   // the banner at the top has What's new and Update and rebuild
+                    }
+                } else {
+                    Text("Engine: not downloaded yet").font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 6) {
+                    switch app.checkState {
+                    case .checking: ProgressView().controlSize(.mini); Text("Checking…")
+                    case .failed(let why): Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange); Text(why).lineLimit(2)
+                    default:
+                        Text(app.lastUpdateCheck > 0 ? "Checked " + HookLink.ago(ctx.date.timeIntervalSince1970 - app.lastUpdateCheck) : "Not checked yet")
+                    }
+                    Spacer(minLength: 0)
+                    Button("Check now") { Task { await app.checkForUpdates() } }.buttonStyle(.link).disabled(app.checkState == .checking)
+                }.font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            .padding(8)
+        }
+    }
+
+    @ViewBuilder func row(_ name: String, update: String?, open: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: update == nil ? "checkmark.circle.fill" : "arrow.down.circle.fill").foregroundStyle(update == nil ? .green : .orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(.caption.bold())
+                if let u = update { Button(u, action: open).buttonStyle(.link).font(.caption) }
+                else { Text("Up to date").font(.caption).foregroundStyle(.secondary) }
+            }
+        }
+    }
+}
+
+extension HookLink {
+    static func ago(_ s: Double) -> String {
+        if s < 60 { return "just now" }
+        if s < 3600 { let m = Int(s / 60); return "\(m) minute\(m == 1 ? "" : "s") ago" }
+        if s < 86400 { let h = Int(s / 3600); return "\(h) hour\(h == 1 ? "" : "s") ago" }
+        let d = Int(s / 86400); return "\(d) day\(d == 1 ? "" : "s") ago"
     }
 }

@@ -89,6 +89,8 @@ final class HookLink: ObservableObject {
     @Published var appUpdate: AppUpdate? = nil
     @Published var updateMessage = ""
     @AppStorage("lastUpdateCheck") var lastUpdateCheck: Double = 0
+    @Published var engineVersion: EngineVersion? = nil
+    @Published var checkState: CheckState = .never
 
     @Published var work: WorkProgress? = nil   // the progress card (Progress.swift)
 
@@ -174,6 +176,7 @@ final class HookLink: ObservableObject {
         add("disk", "Free disk space (80 GB needed)", gb >= 80 ? .ok : (gb >= 60 ? .warn : .missing), String(format: "%.0f GB free in %@", gb, folder.path))
 
         checks = cs
+        await readEngineVersion()
     }
     var macReady: Bool { !checks.isEmpty && !checks.contains { $0.state == .missing } }
 

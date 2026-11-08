@@ -10,7 +10,8 @@ struct ContentView: View {
             List(Step.allCases, selection: Binding(get: { app.step }, set: { if let s = $0, !app.busy { app.step = s } })) { s in
                 Label(s.title, systemImage: icon(s)).tag(s)
             }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 210)
+            .safeAreaInset(edge: .bottom) { VersionPanel() }
+            .navigationSplitViewColumnWidth(min: 220, ideal: 240)
         } detail: {
             VStack(spacing: 0) {
                 if app.engineUpdate != nil || app.appUpdate != nil || !app.updateMessage.isEmpty { UpdateBanner(); Divider() }
