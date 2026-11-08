@@ -242,8 +242,34 @@ final class HookLink: ObservableObject {
             if cfg.repo.isEmpty {
                 say("The build engine's download address is not set in this copy of HookLink. Set the engine folder in Settings.")
             } else {
-                say("$ git clone --depth 1 -b \(cfg.branch) \(cfg.repo)")
-                await r.run(["git", "clone", "--depth", "1", "-b", cfg.branch, cfg.repo, engine.path]) { self.say($0) }
+                // With progress, and a watchdog: a download that receives nothing for 60 s is stopped and tried again, up to 3 times
+                // (one on the tested Mac stalled at 13 MB of 660 MB for minutes, where the same command took 15 s from a terminal)
+                for attempt in 1...3 {
+                    try? FileManager.default.removeItem(at: engine)
+                    say("$ git clone --depth 1 -b \(cfg.branch) \(cfg.repo)" + (attempt > 1 ? "   (try \(attempt) of 3)" : ""))
+                    workStep(5, attempt == 1 ? "Downloading the build engine" : "Downloading the build engine (try \(attempt) of 3)", fraction: 0)
+                    let clone = Runner(); runner = clone
+                    var last = Date(), stalled = false
+                    let watchdog = Task { @MainActor in
+                        while !Task.isCancelled {
+                            try? await Task.sleep(for: .seconds(5))
+                            if Date().timeIntervalSince(last) > 60 { stalled = true; clone.cancel(); break }
+                        }
+                    }
+                    let st = await clone.run(["git", "clone", "--progress", "--depth", "1", "-b", cfg.branch, cfg.repo, engine.path]) { line in
+                        last = Date()
+                        // "Receiving objects:  45% (1234/2742), 120.00 MiB | 30.00 MiB/s"
+                        if let r = line.range(of: #"Receiving objects:\s+(\d+)%"#, options: .regularExpression) {
+                            let pct = line[r].split(separator: " ").last.map { String($0.dropLast()) }.flatMap { Double($0) }
+                            if let pct { self.workFraction(pct / 100) }
+                            self.workDetail(line)
+                        } else { self.say(line) }
+                    }
+                    watchdog.cancel()
+                    if st == 0 { break }
+                    say(stalled ? "The download stopped receiving data for a minute: trying again." : "The download failed (status \(st)): trying again.")
+                    if attempt == 3 { say("The build engine couldn't be downloaded. Check your internet connection and click Install tools again.") }
+                }
             }
         }
         await runChecks()
