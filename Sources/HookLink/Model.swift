@@ -264,6 +264,11 @@ final class HookLink: ObservableObject {
                 self.stageCount = ev["n"] as? Int ?? self.stageCount
                 self.stageName = ev["name"] as? String ?? ""
                 self.stageFraction = nil; self.stageETA = ""
+                // The update the game is at, from the first stage's name ("unpack v131072"): any other update stops the build
+                if self.stageName.hasPrefix("unpack v"), let upd = self.stageName.split(separator: " ").last.map(String.init), upd != Game.version {
+                    self.buildError = "This game is at update \(upd). HookLink supports only update \(Game.version). Update the game on your Switch 2, dump it again, and try again."
+                    r.cancel()
+                }
                 self.say("[\(self.stageIndex)/\(self.stageCount)] \(self.stageName)")
             case "progress":
                 self.stageFraction = ev["frac"] as? Double
@@ -280,13 +285,10 @@ final class HookLink: ObservableObject {
                 }
             case "game":
                 let text = String(decoding: data, as: UTF8.self)
+                // Only the title here: this event's "version" is the display version ("1.0"), not the update; the update is checked at the unpack stage below
                 let title = (ev["title_id"] as? String ?? text).uppercased()
-                let version = "\(ev["version"] ?? "")"
                 if !title.contains(Game.titleID) {
                     self.buildError = "This is not Ocarina of Time (Nintendo Switch 2 Edition, \(Game.titleID)). HookLink builds only that game."
-                    r.cancel()
-                } else if !version.isEmpty && !version.contains(Game.version.dropFirst()) {
-                    self.buildError = "This game is at version \(version). HookLink supports only update \(Game.version). Update the game on your Switch 2, dump it again, and try again."
                     r.cancel()
                 }
             default: self.say(line)
