@@ -28,3 +28,4 @@ exefs/
 build/
 pso_archive/
 res_overlay/
+.swiftpm/

@@ -1,0 +1,8 @@
+name: Idea
+description: A feature or improvement for HookLink
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes: { label: Your idea, description: "What would you like HookLink to do, and why?" }
+    validations: { required: true }

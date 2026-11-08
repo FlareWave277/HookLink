@@ -1,0 +1,25 @@
+name: Build problem
+description: HookLink stops while checking, building, or copying to the phone
+labels: [build]
+body:
+  - type: markdown
+    attributes:
+      value: "**Never attach game files, keys or IPAs.** The text from HookLink's Show details panel is fine."
+  - type: input
+    id: version
+    attributes: { label: HookLink version, placeholder: "0.1.0" }
+    validations: { required: true }
+  - type: input
+    id: mac
+    attributes: { label: Mac model, macOS and Xcode version, placeholder: "MacBook Pro M4, macOS 26.6, Xcode 27.2" }
+    validations: { required: true }
+  - type: dropdown
+    id: step
+    attributes:
+      label: Which step
+      options: [Check your Mac, Choose your game, Build, Copy game files, Other]
+    validations: { required: true }
+  - type: textarea
+    id: details
+    attributes: { label: What happened, description: "Paste the last 30 lines from Show details.", render: text }
+    validations: { required: true }

@@ -1,0 +1,26 @@
+name: Game problem
+description: Something wrong while playing (graphics, sound, crash, slowdown)
+labels: [game]
+body:
+  - type: markdown
+    attributes:
+      value: "**Never attach game files, IPAs or anything made from your dump.** Screenshots, videos and the game's log.txt are fine."
+  - type: input
+    id: version
+    attributes: { label: HookLink version, placeholder: "0.1.0" }
+    validations: { required: true }
+  - type: input
+    id: iphone
+    attributes: { label: iPhone model and iOS version, placeholder: "iPhone 18 Pro Max, iOS 27.2" }
+    validations: { required: true }
+  - type: input
+    id: where
+    attributes: { label: Where in the game, placeholder: "Hyrule Field, near the castle bridge" }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: "What you saw, and what you expected. Was the phone warm?" }
+    validations: { required: true }
+  - type: textarea
+    id: media
+    attributes: { label: Screenshot, video or log.txt, description: "Drag files here. log.txt is in the game's folder on the phone (Files app, or HookLink can fetch it later)." }
