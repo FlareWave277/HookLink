@@ -37,5 +37,5 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true   # ad-hoc signature, so macOS runs it after the right-click → Open prompt
-(cd dist && rm -f HookLink.zip && ditto -c -k --keepParent HookLink.app HookLink.zip)
+(cd dist && rm -f HookLink.zip && ditto -c -k --norsrc --noextattr --noqtn --keepParent HookLink.app HookLink.zip)
 echo "built $APP and dist/HookLink.zip ($VERSION)"

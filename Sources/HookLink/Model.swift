@@ -118,7 +118,8 @@ final class HookLink: ObservableObject {
     var resources: URL {
         if let r = Bundle.main.resourceURL, FileManager.default.fileExists(atPath: r.appendingPathComponent("tools").path) { return r }
         if let e = ProcessInfo.processInfo.environment["HOOKLINK_RESOURCES"] { return URL(fileURLWithPath: e) }
-        return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources")
+        // `swift run` from the source folder: Resources beside the current directory (no build-machine path compiled in)
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources")
     }
 
     func say(_ s: String) { log.append(s); if log.count > 4000 { log.removeFirst(log.count - 4000) }; workDetail(s) }
