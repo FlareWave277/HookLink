@@ -150,8 +150,13 @@ final class HookLink: ObservableObject {
         for t in ["xcodegen", "zstd", "glslangValidator"] { if (await Runner.capture(["which", t])).status != 0 { tools.append(t) } }
         add("tools", "Build tools (xcodegen, zstd, glslang)", tools.isEmpty ? .ok : .missing, tools.isEmpty ? "Installed" : "Missing: \(tools.joined(separator: ", ")). Click Install tools below.")
 
-        let venvOK = FileManager.default.fileExists(atPath: venvPython.path)
-        add("venv", "HookLink's Python packages", venvOK ? .ok : .missing, venvOK ? "Ready" : "Click Install tools below.")
+        // The environment must be on a 3.12+ Python and hold the build's packages (an older HookLink could make one on macOS's 3.9)
+        let venvCheck = FileManager.default.fileExists(atPath: venvPython.path)
+            ? await Runner.capture([venvPython.path, "-c", "import sys, lz4, capstone, zbic; assert sys.version_info >= (3, 12); print('%d.%d' % sys.version_info[:2])"])
+            : (status: Int32(1), out: "")
+        let venvOK = venvCheck.status == 0
+        add("venv", "HookLink's Python packages", venvOK ? .ok : .missing,
+            venvOK ? "Ready (Python \(venvCheck.out.trimmingCharacters(in: .whitespacesAndNewlines)))" : "Click Install tools below.")
 
         let engOK = FileManager.default.fileExists(atPath: engine.appendingPathComponent("scripts/build_ipa_from_nsp.py").path)
         add("engine", "Build engine (nxnative)", engOK ? .ok : .missing, engOK ? engine.path : "Click Install tools below to download it.")
@@ -201,6 +206,12 @@ final class HookLink: ObservableObject {
         if missing.contains("tools") || missing.contains("python") {
             say("$ brew install xcodegen zstd glslang python@3.13")
             await r.run(["brew", "install", "xcodegen", "zstd", "glslang", "python@3.13"]) { self.say($0) }
+        }
+        // An environment on an old Python (an earlier HookLink used macOS's 3.9) is made again
+        if FileManager.default.fileExists(atPath: venvPython.path),
+           (await Runner.capture([venvPython.path, "-c", "import sys; assert sys.version_info >= (3, 12)"])).status != 0 {
+            say("HookLink's Python environment is on an old Python: making it again")
+            try? FileManager.default.removeItem(at: support.appendingPathComponent("venv"))
         }
         if !FileManager.default.fileExists(atPath: venvPython.path) {
             guard let py = await findPython() else { say("No Python 3.12 or newer was found, so HookLink's packages cannot be installed. Check that Homebrew installed python@3.13."); await runChecks(); return }
