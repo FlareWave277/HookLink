@@ -34,22 +34,34 @@ HookLink is a Mac app that turns your own dump of Ocarina of Time into an iPhone
 ### With the HookLink app (the easy way)
 
 1. Download **HookLink.zip** from the [Releases](../../releases) page and unzip it.
-2. Right-click **HookLink.app** → **Open** (the first time only; it isn't from the App Store).
+2. Open **HookLink.app**. The first time, macOS says it can't check it for malware (it isn't from the App Store or notarized): open **System Settings → Privacy & Security**, scroll down, click **Open Anyway**, then open HookLink again.
 3. Follow the steps in the window:
    1. **Check your Mac**: HookLink finds what's missing and installs most of it for you.
    2. **Choose your game**: drop your `.nup` file in.
    3. **Choose your iPhone** model.
    4. **Build**: a few hours the first time. You can keep using your Mac.
    5. **Install** the IPA with your sideloading tool.
-   6. **Copy game files**: plug in your iPhone and click one button.
+   6. **Copy game files**: plug in your iPhone and click one button (or use Finder, if the cable copy keeps stopping).
    7. **Play.**
+
+### How long it takes
+
+| Step | First time | Later builds |
+|---|---|---|
+| Check your Mac and install tools | 5–20 min (plus Xcode's own download, if you need it) | Seconds |
+| Build, step 1–3 (unpack, rewrite, split shaders) | ~10 min | ~5 min |
+| Build, step 4 (iOS shaders) | ~1 h 10 min. Part of it shows no percentage for 10+ minutes while it checks the shader cache: that's normal | Minutes, unless an update changes the shaders |
+| Build, step 5 (app and GPU pipeline archive) | ~45 min | Minutes |
+| Build, step 6 (pack the IPA) | ~5 min | ~5 min |
+| Copy game files to the phone | 10–25 min | Not needed again |
+| First start of the game ("Preparing shaders") | A few minutes, once | Seconds |
 
 ### What you need
 
 - A Mac with Apple silicon, macOS 26.6 or later.
 - [Xcode 27.2](https://developer.apple.com/download/all/?q=Xcode%2027.2), opened once, with the iOS platform (Xcode → Settings → Components).
 - [Homebrew](https://brew.sh).
-- About **80 GB free** while building.
+- About **80 GB free** while building. The build folder keeps about 70 GB afterwards so later builds are fast; see [Disk space](#disk-space).
 - Your game: program `0400486024DEC000`, update `v131072`, as a `.nup`. Other versions don't work.
 - An iPhone 18 Pro / Pro Max (tested) or an iPhone 17 model (untested), with **Developer Mode** on, and a cable.
 - A sideloading tool such as iLoader, Sideloadly or AltStore.
@@ -70,12 +82,14 @@ Use `--gpu g18p` for an iPhone 17 model.
 
 ## Installing and copying the game
 
-The IPA holds the app, its shaders and its GPU pipeline archive (about 6 GB). The game's own files (about 24 GB) are copied to the phone separately, once:
+The IPA holds the app, its shaders and its GPU pipeline archive (about 5 GB). The game's own files (about 24 GB) are copied to the phone separately, once:
 
 1. Install the IPA with your sideloading tool. Turn on **Increased Memory Limit** if it offers it.
 2. Don't open the game yet.
-3. In HookLink, **Copy game files**: plug in your iPhone, unlock it, tap **Trust**, then click the button. HookLink copies the game files and the iPhone resolution file made from your game, then checks them.
+3. In HookLink, **Copy game files**: set **Auto-Lock → Never** on the phone, plug it in, unlock it, tap **Trust**, then click the button. HookLink copies the game files and the iPhone resolution file made from your game, then checks them.
 4. Open the game.
+
+**If the cable copy keeps stopping**, click **Copy with Finder instead**. HookLink shows the file in Finder; drag it onto the game in your iPhone's **Files** tab in Finder, wait for Finder to finish, then click **Finder is done: check and finish**. HookLink checks the game files arrived whole and does the rest.
 
 ## Updating
 
@@ -87,16 +101,32 @@ HookLink checks for updates every time you open it (and from **HookLink → Chec
 ## What HookLink tunes for the iPhone
 
 - **Pipelines:** a draw waiting for its pipeline no longer repeats failed archive searches every frame. Each pipeline the game asks for is listed for the next start, which builds them all behind the loading screen.
+- **First starts:** the app ships with a list of the pipelines recorded while playing Kokiri Forest, Hyrule Field, Castle Town and Hyrule Castle, so those areas are prepared before the game starts instead of stuttering. Players' shared lists extend it with every update.
+- **GPU:** nxnative's latest work for this game: occlusion tests that let hidden grass be skipped, faster mesh-shader loads (the foliage), no 2 ms GPU wait each frame, faster shader math, and the mist without dark specks.
 - **Memory:** render targets share one placement heap (3 GB in 0.7 GB), and textures of scenes you've left are retired when memory runs short (fixes the freeze after the talk with Saria).
 - **Game speed:** the game moves at real speed even when a frame runs long, without dropping to 30 fps.
 - **Resolution:** the handheld dynamic resolution ranges from 1080×608 down to 640×360 on the phone, made from your own game files.
 - **Settings:** thread priorities, no 30 fps hold, no 30 fps thermal cap.
+
+## Disk space
+
+HookLink keeps its build folder (the folder you chose, about 70 GB) so later builds take minutes instead of hours.
+
+| Safe to delete | Don't delete (costs a long rebuild) |
+|---|---|
+| Old IPAs you no longer need | `build/shader` (the shader cache: over an hour to rebuild) |
+| `copy-to-phone` (only a link to your game files, no extra space) | `build/ipa` (holds the GPU pipeline archive: about 45 minutes to rebuild) |
+| | `build/extract` (your game, unpacked) |
+
+To remove HookLink completely, delete the app, the build folder, and `~/Library/Application Support/HookLink`.
 
 ## If something goes wrong
 
 | Problem | What to do |
 |---|---|
 | HookLink says the game isn't supported | Check it's the Switch 2 Edition with update v131072, as a `.nup` |
+| The build seems stuck | Look at the progress card's timer and its last line: some steps go quiet for 10+ minutes. Stopped for over an hour? Click **Show details** |
+| The game file copy stops part way | Set Auto-Lock to Never and keep the phone unlocked; if it still stops, use **Copy with Finder instead** |
 | The build stops | Click **Show details** and look at the last lines. Free disk space and Xcode 27.2 are the usual causes |
 | "No iPhone found" | Use a cable, unlock the phone, tap Trust, turn on Developer Mode |
 | "The game is not installed on this iPhone" | Install the IPA first, then click **Find my iPhone** again |
