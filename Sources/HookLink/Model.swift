@@ -90,6 +90,8 @@ final class HookLink: ObservableObject {
     @Published var updateMessage = ""
     @AppStorage("lastUpdateCheck") var lastUpdateCheck: Double = 0
 
+    @Published var work: WorkProgress? = nil   // the progress card (Progress.swift)
+
     private var runner: Runner?
 
     // MARK: Paths
@@ -119,14 +121,18 @@ final class HookLink: ObservableObject {
         return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources")
     }
 
-    func say(_ s: String) { log.append(s); if log.count > 4000 { log.removeFirst(log.count - 4000) } }
+    func say(_ s: String) { log.append(s); if log.count > 4000 { log.removeFirst(log.count - 4000) }; workDetail(s) }
 
     // MARK: Step 1: the Mac
 
     func runChecks() async {
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; endWork() }
+        beginWork("Checking your Mac", steps: 9)
         var cs: [Check] = []
-        func add(_ id: String, _ name: String, _ state: Check.State, _ detail: String) { cs.append(Check(id: id, name: name, state: state, detail: detail)) }
+        func add(_ id: String, _ name: String, _ state: Check.State, _ detail: String) {
+            cs.append(Check(id: id, name: name, state: state, detail: detail)); workStep(min(cs.count + 1, 9), name)
+        }
+        workStep(1, "Xcode")
 
         let xc = await Runner.capture(["xcodebuild", "-version"])
         let xcVer = xc.out.split(separator: "\n").first.map(String.init) ?? ""
@@ -196,17 +202,21 @@ final class HookLink: ObservableObject {
 
     /// Installs what the checks found missing. Homebrew and Xcode themselves are the player's to install.
     func installTools() async {
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; endWork() }
         let r = Runner(); runner = r
         let missing = Set(checks.filter { $0.state == .missing }.map(\.id))
+        beginWork("Installing tools", steps: 5)
+        workStep(1, "Metal toolchain")
         if missing.contains("metal") {
             say("$ xcodebuild -downloadComponent MetalToolchain")
             await r.run(["xcodebuild", "-downloadComponent", "MetalToolchain"]) { self.say($0) }
         }
+        workStep(2, "Homebrew tools")
         if missing.contains("tools") || missing.contains("python") {
             say("$ brew install xcodegen zstd glslang python@3.13")
             await r.run(["brew", "install", "xcodegen", "zstd", "glslang", "python@3.13"]) { self.say($0) }
         }
+        workStep(3, "Python environment")
         // An environment on an old Python (an earlier HookLink used macOS's 3.9) is made again
         if FileManager.default.fileExists(atPath: venvPython.path),
            (await Runner.capture([venvPython.path, "-c", "import sys; assert sys.version_info >= (3, 12)"])).status != 0 {
@@ -218,9 +228,11 @@ final class HookLink: ObservableObject {
             say("$ \(py.path) -m venv \(support.appendingPathComponent("venv").path)")
             await r.run([py.path, "-m", "venv", support.appendingPathComponent("venv").path]) { self.say($0) }
         }
+        workStep(4, "Python packages")
         say("$ pip install (the build's Python packages)")
         await r.run([venvPython.path, "-m", "pip", "install", "--upgrade", "lz4", "capstone>=5,<6", "fonttools", "nsz", "zbic",
                      "backports.zstd; python_version < '3.14'"]) { self.say($0) }
+        workStep(5, "Build engine")
         if !FileManager.default.fileExists(atPath: engine.appendingPathComponent("scripts/build_ipa_from_nsp.py").path) {
             let cfg = Engine.load(from: resources)
             if cfg.repo.isEmpty {
@@ -243,7 +255,8 @@ final class HookLink: ObservableObject {
     // MARK: Step 4: build
 
     func build() async {
-        busy = true; buildOK = false; buildError = ""; damagedFiles = []; defer { busy = false }
+        busy = true; buildOK = false; buildError = ""; damagedFiles = []; defer { busy = false; endWork() }
+        beginWork("Building the iPhone app", steps: 6)
         try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
         let args = [venvPython.path, "-I", engine.appendingPathComponent("scripts/build_ipa_from_nsp.py").path, nupPath,
                     "--platform", "ios", "--romfs", "separate", "--allow-damaged", "--gpu", gpu,
@@ -264,6 +277,7 @@ final class HookLink: ObservableObject {
                 self.stageCount = ev["n"] as? Int ?? self.stageCount
                 self.stageName = ev["name"] as? String ?? ""
                 self.stageFraction = nil; self.stageETA = ""
+                self.work?.stepCount = self.stageCount; self.workStep(self.stageIndex, self.stageName)
                 // The update the game is at, from the first stage's name ("unpack v131072"): any other update stops the build
                 if self.stageName.hasPrefix("unpack v"), let upd = self.stageName.split(separator: " ").last.map(String.init), upd != Game.version {
                     self.buildError = "This game is at update \(upd). HookLink supports only update \(Game.version). Update the game on your Switch 2, dump it again, and try again."
@@ -273,6 +287,9 @@ final class HookLink: ObservableObject {
             case "progress":
                 self.stageFraction = ev["frac"] as? Double
                 if let eta = ev["eta"] as? Double { self.stageETA = HookLink.hms(eta) } else { self.stageETA = "" }
+                self.workFraction(self.stageFraction, eta: self.stageETA)
+                if let note = ev["note"] as? String, !note.isEmpty { self.workDetail(note) }
+                else if let d = ev["done"] as? Int, let t = ev["total"] as? Int { self.workDetail("\(d) of \(t) \(ev["unit"] as? String ?? "")") }
             case "stage_end":
                 let ok = ev["ok"] as? Bool ?? true
                 self.say("\(ok ? "✓" : "✗") \(ev["name"] as? String ?? ""): \(ev["summary"] as? String ?? "")")
@@ -339,7 +356,8 @@ final class HookLink: ObservableObject {
 
     func copyToPhone() async {
         guard let d = device, !bundleID.isEmpty else { return }
-        busy = true; copyOK = false; copyStatus = []; defer { busy = false }
+        busy = true; copyOK = false; copyStatus = []; defer { busy = false; endWork() }
+        beginWork("Copying to your iPhone", steps: 3)
         let r = Runner(); runner = r
         // devicectl device copy to|from, into the game's own Documents folder on the phone
         func dc(_ way: String, _ rest: [String]) -> [String] {
@@ -347,10 +365,24 @@ final class HookLink: ObservableObject {
         }
 
         copyStatus.append("Copying the game files (about 24 GB). This takes 10 to 20 minutes…")
+        // devicectl reports no progress: estimate it from the image's size at about 35 MB/s (measured over a cable), capped at 95% until done
+        workStep(1, "Game files", fraction: 0, estimated: true)
+        let bytes = Double((try? romfsImage.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 24_000_000_000)
+        let expect = max(60, bytes / 35_000_000), t0 = Date()
+        let ticker = Task { @MainActor in
+            while !Task.isCancelled {
+                let el = Date().timeIntervalSince(t0)
+                self.workFraction(min(0.95, el / expect), eta: HookLink.hms(max(0, expect - el)))
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+        defer { ticker.cancel() }
         let push = await r.run(["bash", engine.appendingPathComponent("scripts/push_romfs.sh").path, d.id, bundleID, romfsImage.path], cwd: engine, env: toolEnv) { self.say($0) }
         guard push == 0 else { copyStatus.append("✗ The game files did not copy. Check the cable and that the phone is unlocked, then try again."); return }
+        ticker.cancel(); workFraction(1)
         copyStatus.append("✓ Game files copied")
 
+        workStep(2, "Resolution file")
         copyStatus.append("Making the iPhone resolution file from your game…")
         try? FileManager.default.createDirectory(at: overlayFile.deletingLastPathComponent(), withIntermediateDirectories: true)
         let res = await r.run([venvPython.path, "-I", resources.appendingPathComponent("tools/hl_resolution.py").path, engine.path, romfsImage.path, overlayFile.path]) { self.say($0) }
@@ -358,6 +390,7 @@ final class HookLink: ObservableObject {
         let up = await r.run(dc("to", ["--source", overlayFile.path, "--destination", "Documents/res_overlay/Pack/Bootup.Nin_Ounce_NVN2.pack.zs"])) { self.say($0) }
         guard up == 0 else { copyStatus.append("✗ The resolution file did not copy."); return }
 
+        workStep(3, "Checking")
         // Check: read it back and compare
         let back = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-check.pack.zs")
         try? FileManager.default.removeItem(at: back)
@@ -375,7 +408,8 @@ final class HookLink: ObservableObject {
     func fetchLog() async {
         if device == nil || bundleID.isEmpty { await findDevices() }
         guard let d = device, !bundleID.isEmpty else { logStatus = "Plug in your iPhone with the game installed, unlock it, and try again."; return }
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; endWork() }
+        beginWork("Getting the game log"); workStep(0, "Copying from your iPhone")
         let desk = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
         var got: [URL] = []
         for (src, name) in [("Documents/log.txt", "HookLink-log.txt"), ("Documents/log.prev.txt", "HookLink-log-previous.txt")] {
@@ -395,7 +429,8 @@ final class HookLink: ObservableObject {
     func sharePipelines() async {
         if device == nil || bundleID.isEmpty { await findDevices() }
         guard let d = device, !bundleID.isEmpty else { shareStatus = "Plug in your iPhone with the game installed, unlock it, and try again."; return }
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; endWork() }
+        beginWork("Saving your pipeline list"); workStep(0, "Copying from your iPhone")
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-pso_user.tsv")
         try? FileManager.default.removeItem(at: tmp)
         _ = await Runner().run(["xcrun", "devicectl", "device", "copy", "from", "--device", d.id, "--domain-type", "appDataContainer",

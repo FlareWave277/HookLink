@@ -14,6 +14,7 @@ struct ContentView: View {
         } detail: {
             VStack(spacing: 0) {
                 if app.engineUpdate != nil || app.appUpdate != nil || !app.updateMessage.isEmpty { UpdateBanner(); Divider() }
+                if let w = app.work { ProgressCard(w: w).padding(.horizontal, 20).padding(.top, 12) }
                 ScrollView { page.padding(28).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading) }
                 Divider()
                 HStack {
@@ -191,9 +192,7 @@ struct BuildPage: View {
                 Label("The app is ready", systemImage: "checkmark.seal.fill").font(.title2).foregroundStyle(.green)
                 HStack { Text(app.ipa.path).textSelection(.enabled).foregroundStyle(.secondary); Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.ipa]) } }
             } else if app.busy {
-                Text("Step \(app.stageIndex) of \(app.stageCount): \(app.stageName)").font(.headline)
-                if let f = app.stageFraction { ProgressView(value: f) } else { ProgressView().progressViewStyle(.linear) }
-                if !app.stageETA.isEmpty { Text("About \(app.stageETA) left in this step").foregroundStyle(.secondary) }
+                Text("The progress is shown above. You can keep using your Mac.").foregroundStyle(.secondary)
                 Button("Stop") { app.cancel() }
             } else {
                 Button("Start the build") { Task { await app.build() } }.buttonStyle(.borderedProminent).controlSize(.large)
@@ -251,7 +250,7 @@ struct CopyPage: View {
                 }
             }
             ForEach(Array(app.copyStatus.enumerated()), id: \.offset) { _, s in Text(s) }
-            if app.busy && !app.copyStatus.isEmpty { ProgressView().progressViewStyle(.linear) }
+
             Text("This copies the game files from your own dump and the iPhone resolution file made from them. You only do this once per phone.").font(.callout).foregroundStyle(.secondary)
         }
     }

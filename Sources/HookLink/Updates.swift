@@ -64,7 +64,8 @@ extension HookLink {
     /// saves, game files and the resolution file stay on the phone.
     func applyEngineUpdate() async {
         guard engineIsManaged, engineUpdate != nil else { return }
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; endWork() }
+        beginWork("Updating the game engine"); workStep(0, "Moving to the new version")
         let cfg = Engine.load(from: resources)
         say("$ git reset --hard origin/\(cfg.branch)   (updating the build engine)")
         let st = await Runner().run(["git", "-C", engine.path, "reset", "--hard", "origin/\(cfg.branch)"]) { self.say($0) }
