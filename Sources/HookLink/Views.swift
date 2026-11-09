@@ -168,6 +168,10 @@ struct GamePage: View {
 
 struct PhonePage: View {
     @EnvironmentObject var app: HookLink
+    private func chooseIcon() {
+        let p = NSOpenPanel(); p.allowedContentTypes = [.png, .jpeg]; p.allowsMultipleSelection = false; p.prompt = "Use this icon"
+        if p.runModal() == .OK, let u = p.url { app.appIcon = u.path }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             PageTitle(title: "Choose your iPhone", subtitle: "The app is built for your iPhone's graphics chip, so it starts quickly and runs smoothly.")
@@ -179,7 +183,20 @@ struct PhonePage: View {
             if let m = PhoneModel.all.first(where: { $0.id == app.gpu }), !m.tested {
                 Text("This model has not been tested yet. It should work; please report how it runs.").foregroundStyle(.orange)
             }
-            Text("Other iPhones are not supported yet: the game needs a recent iPhone's memory and graphics.").font(.callout).foregroundStyle(.secondary)
+            Text("iPhone Duo uses the same chip but has not been tested yet. Other iPhones are not supported yet: the game needs a recent iPhone's memory and graphics.").font(.callout).foregroundStyle(.secondary)
+            GroupBox("Name and icon (optional)") {
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("App name (leave empty for the game's own name)", text: $app.appName).textFieldStyle(.roundedBorder)
+                    HStack(spacing: 10) {
+                        if !app.appIcon.isEmpty, let im = NSImage(contentsOfFile: app.appIcon) {
+                            Image(nsImage: im).resizable().frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        Button(app.appIcon.isEmpty ? "Choose an icon\u{2026}" : "Change icon\u{2026}") { chooseIcon() }
+                        if !app.appIcon.isEmpty { Button("Use the game's icon") { app.appIcon = "" } }
+                    }
+                    Text("Any PNG or JPEG. Changing these needs a new build, but not new game files, and your saves stay.").font(.caption).foregroundStyle(.secondary)
+                }.padding(6)
+            }
         }
     }
 }
@@ -276,6 +293,17 @@ struct DonePage: View {
                 Text("• The phone gets warm in long sessions; it runs best unplugged and not in a case.")
             }
             SavesBox()
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Small game files").font(.headline)
+                    Text("Updates can change a few small files, like the iPhone resolution file. HookLink checks them when your iPhone is plugged in and sends only what changed. Your 24 GB of game files and your saves aren't touched.").font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Check small game files") { Task { await app.updateSmallFiles() } }.disabled(app.busy)
+                        if !app.smallFilesStatus.isEmpty { Text(app.smallFilesStatus).foregroundStyle(.secondary) }
+                    }
+                }.padding(6)
+            }
+            .task { await app.updateSmallFiles(auto: true) }
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Something wrong?").font(.headline)

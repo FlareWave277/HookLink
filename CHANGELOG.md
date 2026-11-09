@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.5
+
+New controls, a wide view for iPhones, and an engine update. **This update has been built but not played on a phone yet**, so please share your game log (**Get game log**) if something looks or runs wrong.
+
+**New: a glass look for the on-screen controls.** All the layouts now use nearly clear buttons with a bright rim and a light-blue press. You can go back to the older look under **Touch controls style** in the game's launcher.
+
+**New: Mobile control layout.** A choice next to 2D, 3D and Tap in the in-game menu: a floating left stick that appears where your thumb lands, the camera on the right half of the screen, round glass buttons with icons and letter chips, and a small D-pad above the stick. (From the kid-with-sword fork of nxnative.)
+
+**New: Wide view (optional, off by default).** Turn on **Wide view** in the game's launcher and the game renders your screen's real shape: you see more at the sides, with no black bars and nothing stretched. It applies the next time the game starts. It draws about a fifth more pixels, so turn it off if your frame rate suffers. The HUD and movies stay in the middle 16:9 area, and a few cutscenes or effects may look off at the edges. (From nxnative pull request 1460 by vladbondarenko97.)
+
+**New: your own app name and icon.** On the **Choose your iPhone** step, you can name the app and pick any PNG or JPEG as its icon. Leave them empty for the game's own.
+
+**New: small game file updates.** On the **Play** step, HookLink compares the small files on your iPhone (such as the resolution file) with the current ones and sends only what changed. It runs by itself after a build when your iPhone is plugged in, and there's a button for it. Your 24 GB of game files and your saves aren't touched.
+
+**iPhone Duo in the phone list.** It uses the same chip as the iPhone 18 Pro, so it shares that choice. It hasn't been tested on a Duo, and the Duo's unfolded screen still shows black bars.
+
+**Changed: fewer waits on the GPU.** The game can now keep 32 batches of GPU work in flight instead of 8. On some runs in Hyrule Field it kept stopping to wait for a free slot and fell to about 20 fps. This is aimed at that slowdown, but its effect hasn't been measured on a phone yet.
+
+**Also from nxnative:** the title movie's upscaling network takes about half the GPU time (measured on an M4 Pro Mac, not an iPhone), mesh-shader models no longer pick up ambient light from the wrong place, fixes for occlusion and memory reads, and faster handling of the pipeline archive.
+
+**Known issues**
+- Hyrule Field and other busy areas can drop into the 40s and 50s once the phone warms up, because iOS slows the CPU.
+- Some surfaces can show as flat single-colour shapes with hard edges. We don't know the cause yet, and this update may or may not fix it. If you see it, please send your log.
+
+**To update:** open HookLink and click **Update and rebuild** on the update banner, then install the new app over the old one. Your saves and game files stay on the phone. This update changes the shaders, so the rebuild is long (about 3 hours on an M-series Mac), and the first "Preparing shaders" on the phone takes a few minutes. If the first session after that feels slow, close the game fully and reopen it.
+
 ## 1.4
 
 An engine update for smoother play in the busy areas, from a 31-minute run from Kokiri Forest to Castle Town on an iPhone 18 Pro Max.

@@ -118,6 +118,8 @@ HookLink checks for updates every time you open it (and from **HookLink → Chec
 - **Memory:** freed render targets' memory is reused for the next one, and textures of scenes you've left are retired when memory runs short (fixes the freeze after the talk with Saria).
 - **Game speed:** the game moves at real speed even when a frame runs long, without dropping to 30 fps.
 - **Resolution:** the handheld dynamic resolution ranges from 1080×608 down to 640×360 on the phone, made from your own game files.
+- **Controls:** a glass look on every on-screen layout, and a Mobile layout with a floating stick, glass buttons and a D-pad (from the [kid-with-sword fork](https://github.com/ednofedulo/kid-with-sword-remake-detached-20261108) of nxnative).
+- **Wide view:** an optional launcher setting that fills an iPhone screen with a wider view and no black bars (from nxnative pull request 1460 by vladbondarenko97).
 - **Settings:** thread priorities, no 30 fps hold, no 30 fps thermal cap.
 
 ## Disk space

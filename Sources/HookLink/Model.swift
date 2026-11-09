@@ -14,7 +14,7 @@ struct PhoneModel: Identifiable, Hashable {
     let name: String
     let tested: Bool
     static let all: [PhoneModel] = [
-        PhoneModel(id: "g19p", name: "iPhone 18 Pro / 18 Pro Max (A20 Pro)", tested: true),
+        PhoneModel(id: "g19p", name: "iPhone 18 Pro / 18 Pro Max / iPhone Duo (A20 Pro)", tested: true),
         PhoneModel(id: "g18p", name: "iPhone 17, 17 Pro, 17 Pro Max, Air (A19 / A19 Pro)", tested: false),
     ]
 }
@@ -65,6 +65,8 @@ final class HookLink: ObservableObject {
     @AppStorage("nupPath") var nupPath: String = ""
     @AppStorage("folderPath") var folderPath: String = NSHomeDirectory() + "/HookLink"
     @AppStorage("gpu") var gpu: String = "g19p"
+    @AppStorage("appName") var appName: String = ""       // the name on the home screen; empty: the game's own
+    @AppStorage("appIcon") var appIcon: String = ""       // a PNG or JPEG of the player's choice; empty: the game's own
     @AppStorage("enginePath") var enginePathSetting: String = ""
 
     // Build
@@ -286,13 +288,16 @@ final class HookLink: ObservableObject {
     // MARK: Step 4: build
 
     func build() async {
-        busy = true; buildOK = false; buildError = ""; damagedFiles = []; defer { busy = false; endWork() }
+        busy = true; buildOK = false; buildError = ""; damagedFiles = []; smallFilesChecked = false; defer { busy = false; endWork() }
         beginWork("Building the iPhone app", steps: 6)
         try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
-        let args = [venvPython.path, "-I", engine.appendingPathComponent("scripts/build_ipa_from_nsp.py").path, nupPath,
+        var args = [venvPython.path, "-I", engine.appendingPathComponent("scripts/build_ipa_from_nsp.py").path, nupPath,
                     "--platform", "ios", "--romfs", "separate", "--allow-damaged", "--gpu", gpu,
                     "--env-file", resources.appendingPathComponent("presets/iphone.env").path,
                     "--work-dir", workDir.path, "-o", ipa.path, "--progress", "json"]
+        let name = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { args += ["--app-name", name] }
+        if !appIcon.isEmpty, FileManager.default.fileExists(atPath: appIcon) { args += ["--icon", appIcon] }
         say("$ " + args.joined(separator: " "))
         let r = Runner(); runner = r
         var collectingDamaged = false
@@ -483,6 +488,38 @@ final class HookLink: ObservableObject {
     }
 
     /// The size of a file in the game's Documents folder on the phone, or nil when it isn't there
+    /// Brings the small game files on the phone up to date without touching the 24 GB image: makes them for the current engine, compares, and sends only what differs.
+    /// auto: the Play step's own check after a build; it says nothing when the phone isn't there.
+    @Published var smallFilesStatus = ""
+    var smallFilesChecked = false
+    func updateSmallFiles(auto: Bool = false) async {
+        if busy || (auto && smallFilesChecked) { return }
+        if device == nil || bundleID.isEmpty { await findDevices() }
+        guard let d = device, !bundleID.isEmpty else { if !auto { smallFilesStatus = "Plug in your iPhone with the game installed, unlock it, and try again." }; return }
+        guard FileManager.default.fileExists(atPath: romfsImage.path) else { if !auto { smallFilesStatus = "HookLink needs your game files on this Mac to make these. Build the app again first." }; return }
+        smallFilesChecked = true; busy = true; defer { busy = false; endWork() }
+        beginWork("Updating the small game files", steps: 3)
+        let remote = "Documents/res_overlay/Pack/Bootup.Nin_Ounce_NVN2.pack.zs"
+        func dc(_ way: String, _ source: String, _ destination: String) -> [String] {
+            ["xcrun", "devicectl", "device", "copy", way, "--device", d.id, "--domain-type", "appDataContainer", "--domain-identifier", bundleID, "--source", source, "--destination", destination]
+        }
+        let r = Runner(); runner = r
+        workStep(0, "Making them from your game")
+        try? FileManager.default.createDirectory(at: overlayFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard await r.run([venvPython.path, "-I", resources.appendingPathComponent("tools/hl_resolution.py").path, engine.path, romfsImage.path, overlayFile.path], onLine: { self.say($0) }) == 0 else { smallFilesStatus = "✗ The resolution file could not be made."; return }
+        workStep(1, "Comparing with your iPhone")
+        let back = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-small.pack.zs")
+        try? FileManager.default.removeItem(at: back)
+        _ = await r.run(dc("from", remote, back.path), onLine: { self.say($0) })
+        let wanted = try? Data(contentsOf: overlayFile)
+        if wanted != nil, (try? Data(contentsOf: back)) == wanted { smallFilesStatus = "✓ Small game files are up to date."; return }
+        workStep(2, "Copying what changed")
+        guard await r.run(dc("to", overlayFile.path, remote), onLine: { self.say($0) }) == 0 else { smallFilesStatus = "✗ The small game files did not copy. Keep the phone unlocked and try again."; return }
+        try? FileManager.default.removeItem(at: back)
+        _ = await r.run(dc("from", remote, back.path), onLine: { self.say($0) })
+        smallFilesStatus = wanted != nil && (try? Data(contentsOf: back)) == wanted ? "✓ Small game files updated." : "✗ The file on your iPhone doesn't match. Try again."
+    }
+
     func phoneFileSize(_ d: Device, _ name: String) async -> Int64? {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("hooklink-files.json")
         try? FileManager.default.removeItem(at: tmp)
