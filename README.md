@@ -113,7 +113,9 @@ HookLink checks for updates every time you open it (and from **HookLink → Chec
 - **Pipelines:** a draw waiting for its pipeline no longer repeats failed archive searches every frame. Each pipeline the game asks for is listed for the next start, which builds them all behind the loading screen.
 - **First starts:** the app ships with a list of the pipelines recorded while playing Kokiri Forest, Hyrule Field, Castle Town and Hyrule Castle, so those areas are prepared before the game starts instead of stuttering. Players' shared lists extend it with every update.
 - **GPU:** nxnative's latest work for this game: occlusion tests that let hidden grass be skipped, faster mesh-shader loads (the foliage), no 2 ms GPU wait each frame, faster shader math, and the mist without dark specks.
-- **Memory:** render targets share one placement heap (3 GB in 0.7 GB), and textures of scenes you've left are retired when memory runs short (fixes the freeze after the talk with Saria).
+- **Mesh shaders:** the foliage, shadow and enemy shaders are prepared before the game starts and saved, instead of freezing the game the first time each one is drawn.
+- **Frame pacing:** the thread that sends each frame to the GPU always runs in iOS's top class, so the busy areas run on the fast cores.
+- **Memory:** freed render targets' memory is reused for the next one, and textures of scenes you've left are retired when memory runs short (fixes the freeze after the talk with Saria).
 - **Game speed:** the game moves at real speed even when a frame runs long, without dropping to 30 fps.
 - **Resolution:** the handheld dynamic resolution ranges from 1080×608 down to 640×360 on the phone, made from your own game files.
 - **Settings:** thread priorities, no 30 fps hold, no 30 fps thermal cap.
