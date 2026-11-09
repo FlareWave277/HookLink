@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.1
+
+A small fix update for 1.5: the same engine, with its Wide view and Mobile controls corrected. **This update has been built but not played on a phone yet**, so please share your game log (**Get game log**) if something looks or runs wrong.
+
+**Fixed: Wide view still showed black bars.** In 1.5 the game rendered the wider picture, but the display step still laid it out as 16:9, so the bars stayed even though the 1.5 notes said they were gone. The display step now gets the picture's real shape. Wide view works on screens from 1.8:1 to 2.6:1, which covers regular iPhones. The iPhone Duo's unfolded screen stays 16:9, with black bars.
+
+**Fixed: Mobile buttons now show what they do.** The icons didn't match the game's actions. The layout is now Y sword, A action, B back, X jump, R shield and ZL Navi, and there's a new ZR button for the held item. This mapping hasn't been checked against every in-game action yet, so please tell us if a button still looks wrong.
+
+**Fixed: Mobile now follows the colour theme.** Its buttons change with **Touch controls style** (Classic, Forest or Glass), like the other layouts.
+
+**To update:** open HookLink and click **Update and rebuild** on the update banner, then install the new app over the old one. Your saves and game files stay on the phone. The shaders didn't change, so if you already built 1.5 none of them are compiled again and "Preparing shaders" on the phone stays short. The rebuild still checks them and packs the app, which took about 2 hours on our Mac.
+
 ## 1.5
 
 New controls, a wide view for iPhones, and an engine update. **This update has been built but not played on a phone yet**, so please share your game log (**Get game log**) if something looks or runs wrong.
