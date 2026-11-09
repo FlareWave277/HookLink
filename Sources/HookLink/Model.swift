@@ -90,6 +90,7 @@ final class HookLink: ObservableObject {
     @Published var updateMessage = ""
     @AppStorage("lastUpdateCheck") var lastUpdateCheck: Double = 0
     @Published var engineVersion: EngineVersion? = nil
+    @Published var saveStatus = ""
     @Published var checkState: CheckState = .never
 
     @Published var work: WorkProgress? = nil   // the progress card (Progress.swift)
@@ -341,6 +342,7 @@ final class HookLink: ObservableObject {
             default: self.say(line)
             }
         }
+        if status != 0, buildError.isEmpty, let hint = HookLink.plainError(log.suffix(200)) { buildError = hint }
         if status == 0 && FileManager.default.fileExists(atPath: ipa.path) {
             buildOK = true; stageFraction = 1; say("Done: \(ipa.path)")
         } else if buildError.isEmpty {
@@ -398,6 +400,8 @@ final class HookLink: ObservableObject {
             ["xcrun", "devicectl", "device", "copy", way, "--device", d.id, "--domain-type", "appDataContainer", "--domain-identifier", bundleID] + rest
         }
         let bytes = Int64((try? romfsImage.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        // The phone's saves first, if it has any: the copy writes only game files, but a save is too precious to risk
+        if let b = await backupSaves("before copying game files", quiet: true) { copyStatus.append("✓ Your saves were backed up first (\(b.lastPathComponent))") }
 
         if viaFinder {
             workStep(1, "Checking the game files you copied with Finder")
@@ -489,6 +493,19 @@ final class HookLink: ObservableObject {
         for f in files where (f["relativePath"] as? String) == name || (f["name"] as? String) == name {
             if let m = f["metadata"] as? [String: Any], let n = m["size"] as? NSNumber { return n.int64Value }
         }
+        return nil
+    }
+
+    /// Known build failures, said plainly: the last lines of the build's output → what to do
+    static func plainError<S: Sequence>(_ lines: S) -> String? where S.Element == String {
+        let text = lines.joined(separator: "\n").lowercased()
+        if text.contains("metal") && (text.contains("compiler") || text.contains("toolchain")) && (text.contains("differs") || text.contains("lock") || text.contains("another") || text.contains("not found") || text.contains("version")) {
+            return "The build needs Xcode 27.2's Metal compiler, and this Mac has a different one. Install Xcode 27.2 from developer.apple.com (you can keep other versions), then in Terminal run: sudo xcode-select -s /Applications/Xcode.app (or the 27.2 app's name), open Xcode once, and build again."
+        }
+        if text.contains("no space left") || text.contains("disk is full") || text.contains("not enough space") {
+            return "The disk ran out of space. Free up space (the build needs about 80 GB; see Disk space in the README), then build again: finished parts are kept."
+        }
+        if text.contains("xcodegen") && text.contains("not found") { return "A build tool is missing. Go back to Check your Mac and click Install tools." }
         return nil
     }
 

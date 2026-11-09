@@ -202,6 +202,7 @@ struct BuildPage: View {
             if !app.buildError.isEmpty { Text(app.buildError).foregroundStyle(.red) }
             if !app.damagedFiles.isEmpty {
                 Text("Your dump has \(app.damagedFiles.count) damaged file(s). The build goes on; those textures may look wrong in the game. Dumping the game again fixes it.").foregroundStyle(.orange)
+                ForEach(app.damagedFiles, id: \.self) { Text($0).font(.caption.monospaced()).foregroundStyle(.secondary) }
             }
             Text("Keep your Mac plugged in. It will not sleep while HookLink builds.").font(.callout).foregroundStyle(.secondary)
         }
@@ -217,7 +218,7 @@ struct InstallPage: View {
                 Label("Open your sideloading tool and sign in with your Apple Account.", systemImage: "1.circle")
                 Label("Choose HookLink-OcarinaOfTime.ipa from your build folder.", systemImage: "2.circle")
                 Label("If it offers Increased Memory Limit, turn it on.", systemImage: "3.circle")
-                Label("Install it. Updating later? Install over the old one; your saves and game files stay.", systemImage: "4.circle")
+                Label("Install it. Updating later? Install over the old one; your saves and game files stay. Never delete the game first: that deletes its saves. Back them up on the Play step to be safe.", systemImage: "4.circle")
                 Label("Don't open the game yet: it needs its game files first.", systemImage: "5.circle")
             }
             Button("Show the app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.ipa]) }
@@ -270,9 +271,11 @@ struct DonePage: View {
             PageTitle(title: "Play", subtitle: "Open the game on your iPhone.")
             VStack(alignment: .leading, spacing: 8) {
                 Text("• The first start shows \"Preparing shaders\" and can take a few minutes. Later starts take seconds.")
+                Text("• If the first session after installing feels slow, close the game fully (swipe it away) and open it again: the next start runs at full speed.")
                 Text("• A new area can stutter the first time you enter it. The next start prepares it, and it runs smoothly after that.")
                 Text("• The phone gets warm in long sessions; it runs best unplugged and not in a case.")
             }
+            SavesBox()
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Something wrong?").font(.headline)

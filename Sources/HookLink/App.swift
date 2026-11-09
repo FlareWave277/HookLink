@@ -3,6 +3,21 @@ import SwiftUI
 @main
 struct HookLinkApp: App {
     @StateObject private var app = HookLink()
+
+    init() {
+        // Command-line checks of the phone steps, for testing and support (the window isn't opened):
+        //   HookLink --backup-saves            HookLink --restore-saves <backup folder>
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(where: { $0 == "--backup-saves" || $0 == "--restore-saves" }) {
+            let restore = args[i] == "--restore-saves", from = i + 1 < args.count ? args[i + 1] : nil
+            Task { @MainActor in
+                let h = HookLink()
+                if restore, let from { await h.restoreSaves(from: URL(fileURLWithPath: from)) } else { await h.backupSaves("backup") }
+                print(h.saveStatus); exit(h.saveStatus.hasPrefix("✓") ? 0 : 1)
+            }
+            RunLoop.main.run()
+        }
+    }
     @State private var sleepBlock: NSObjectProtocol?
 
     var body: some Scene {

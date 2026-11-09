@@ -91,6 +91,16 @@ The IPA holds the app, its shaders and its GPU pipeline archive (about 5 GB). Th
 
 **If the cable copy keeps stopping**, click **Copy with Finder instead**. HookLink shows the file in Finder; drag it onto the game in your iPhone's **Files** tab in Finder, wait for Finder to finish, then click **Finder is done: check and finish**. HookLink checks the game files arrived whole and does the rest.
 
+## Your saves
+
+Your saves live only on your iPhone, inside the game. HookLink can keep copies on your Mac:
+
+- **Play → Back up my saves** copies them to `Documents/HookLink Save Backups/<date>` on the Mac.
+- HookLink also backs them up **by itself before copying game files** to the phone.
+- **Play → Restore a backup…** puts a backup back on the phone (close the game first). What's on the phone is backed up first, and every file is checked after copying.
+
+**Never delete the game from your phone to reinstall it:** that deletes its saves. Install the new version over the old one instead, and back up first to be safe.
+
 ## Updating
 
 HookLink checks for updates every time you open it (and from **HookLink → Check for Updates…**):
@@ -132,6 +142,8 @@ To remove HookLink completely, delete the app, the build folder, and `~/Library/
 | "The game is not installed on this iPhone" | Install the IPA first, then click **Find my iPhone** again |
 | The game closes at start | Copy the game files again from HookLink; make sure Increased Memory Limit is on |
 | Stutter the first time somewhere | Normal: the next start prepares that area |
+| The first session after installing runs slowly | Close the game fully (swipe it away) and open it again: the next start runs at full speed |
+| "The build needs Xcode 27.2's Metal compiler" | Install Xcode 27.2 and select it (`sudo xcode-select -s /Applications/Xcode.app`), then build again |
 
 Still stuck? Click **Get game log** on HookLink's last step, then [open an issue](../../issues) or ask on [Discord](https://discord.gg/bSrN5kEScg) with your iPhone model, iOS version, where you were in the game and what happened. A screenshot or video helps. **Never attach game files.**
 
