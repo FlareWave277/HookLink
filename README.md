@@ -118,7 +118,7 @@ HookLink checks for updates every time you open it (and from **HookLink → Chec
 - **Memory:** freed render targets' memory is reused for the next one, and textures of scenes you've left are retired when memory runs short (fixes the freeze after the talk with Saria).
 - **Game speed:** the game moves at real speed even when a frame runs long, without dropping to 30 fps.
 - **Resolution:** the handheld dynamic resolution ranges from 1080×608 down to 640×360 on the phone, made from your own game files.
-- **Controls:** a glass look on every on-screen layout, and a Mobile layout with a floating stick, glass buttons and a D-pad (from the [kid-with-sword fork](https://github.com/ednofedulo/kid-with-sword-remake-detached-20261108) of nxnative).
+- **Controls:** a glass look on every on-screen layout, and a Mobile layout with a floating stick, glass buttons and a D-pad (inspired by cheemu21's kid-with-sword; from the [kid-with-sword fork](https://github.com/ednofedulo/kid-with-sword-remake-detached-20261108) of nxnative).
 - **Wide view:** an optional launcher setting that fills an iPhone screen with a wider view and no black bars (from nxnative pull request 1460 by vladbondarenko97).
 - **Settings:** thread priorities, no 30 fps hold, no 30 fps thermal cap.
 
@@ -162,6 +162,7 @@ Still stuck? Click **Get game log** on HookLink's last step, then [open an issue
 
 - **[nxnative](https://github.com/seedds/nxnative)** by seedds and its contributors: the engine HookLink runs, which translates the game to native code and Metal.
 - **gunvalk**: found that the game's frame step ignores the frame's time (zortos293/Lichii PR #216), the basis of the real-speed fix.
+- **[cheemu21](https://github.com/cheemu21)**, creator of kid-with-sword: inspired HookLink's touch controls, the glass look and the Mobile layout.
 - **[HookShot](https://github.com/NotRexed/Hookshot)** by NotRexed: inspired HookLink's name.
 
 ## License

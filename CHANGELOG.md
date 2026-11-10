@@ -33,7 +33,7 @@ New controls, a wide view for iPhones, and an engine update. **This update has b
 
 **New: a glass look for the on-screen controls.** All the layouts now use nearly clear buttons with a bright rim and a light-blue press. You can go back to the older look under **Touch controls style** in the game's launcher.
 
-**New: Mobile control layout.** A choice next to 2D, 3D and Tap in the in-game menu: a floating left stick that appears where your thumb lands, the camera on the right half of the screen, round glass buttons with icons and letter chips, and a small D-pad above the stick. (From the kid-with-sword fork of nxnative.)
+**New: Mobile control layout.** A choice next to 2D, 3D and Tap in the in-game menu: a floating left stick that appears where your thumb lands, the camera on the right half of the screen, round glass buttons with icons and letter chips, and a small D-pad above the stick. (Inspired by cheemu21, creator of kid-with-sword; from the kid-with-sword fork of nxnative.)
 
 **New: Wide view (optional, off by default).** Turn on **Wide view** in the game's launcher and the game renders your screen's real shape: you see more at the sides, with no black bars and nothing stretched. It applies the next time the game starts. It draws about a fifth more pixels, so turn it off if your frame rate suffers. The HUD and movies stay in the middle 16:9 area, and a few cutscenes or effects may look off at the edges. (From nxnative pull request 1460 by vladbondarenko97.)
 
