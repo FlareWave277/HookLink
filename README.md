@@ -161,6 +161,9 @@ Still stuck? Click **Get game log** on HookLink's last step, then [open an issue
 ## Credits
 
 - **[nxnative](https://github.com/seedds/nxnative)** by seedds and its contributors: the engine HookLink runs, which translates the game to native code and Metal.
+- **[PromethOps](https://github.com/PromethOps)**: [nxnative PR #1455](https://github.com/seedds/nxnative/pull/1455), unused textures are retired when GPU memory runs short (the freeze after the talk with Saria).
+- **[LeonardoBai12](https://github.com/LeonardoBai12)**: [nxnative PR #1543](https://github.com/seedds/nxnative/pull/1543), the game keeps real speed below 60 fps.
+- **[vladbondarenko97](https://github.com/vladbondarenko97)**: [nxnative PR #1460](https://github.com/seedds/nxnative/pull/1460), the code locations behind Wide view.
 - **gunvalk**: found that the game's frame step ignores the frame's time (zortos293/Lichii PR #216), the basis of the real-speed fix.
 - **[cheemu21](https://github.com/cheemu21)**, creator of kid-with-sword: inspired HookLink's touch controls, the glass look and the Mobile layout.
 - **[HookShot](https://github.com/NotRexed/Hookshot)** by NotRexed: inspired HookLink's name.
