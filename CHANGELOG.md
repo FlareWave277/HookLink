@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6
+
+Wide view now shows more of the game, plus 14 engine fixes from nxnative. **This update has been built but not played on a phone yet**, so please share your game log (**Get game log**) if something looks or runs wrong.
+
+**Fixed: Wide view stretched the picture.** In 1.5 and 1.5.1 the game rendered a wider picture, but its cameras still used a 16:9 view, so Wide view stretched the picture instead of showing more. The 1.5 notes said nothing was stretched, and the 1.5.1 notes didn't mention it; both were wrong. Now the camera uses your screen's shape: the view keeps its height and shows more at the sides. If things pop in or vanish at the left and right edges, or the HUD or menus look wrong, please send your log.
+
+**From nxnative:**
+- **Terrain:** ground tiles no longer vanish or show another tile's surface after you walk a while. This may be the cause of the flat single-colour shapes some players saw, but that isn't confirmed.
+- **Death Mountain Trail:** the light-blue dashes over the rock at the cave entrance are gone.
+- **GPU:** a faster check in the shaders that mark which memory each pass used (measured on an Apple M6, not an iPhone).
+- **Memory and storage:** freed GPU memory is released sooner when the game pauses its drawing, textures are no longer read again when nothing changed them, and the game's files give disk space back (an iPad had stopped the game at 5 GB free).
+- Fixes for textures that change size, for presenting frames, and the iOS build fix that 1.5 already carried.
+
+**To update:** open HookLink and click **Update and rebuild** on the update banner, then install the new app over the old one. Your saves and game files stay on the phone. This update changes the shaders, so every shader is compiled again: the rebuild took about 2 hours of work on our Mac. Keep the Mac awake while it runs, because sleep pauses it. The first "Preparing shaders" on the phone takes a few minutes. If the first session after that feels slow, close the game fully and reopen it.
+
 ## 1.5.1
 
 A small fix update for 1.5: the same engine, with its Wide view and Mobile controls corrected. **This update has been built but not played on a phone yet**, so please share your game log (**Get game log**) if something looks or runs wrong.
